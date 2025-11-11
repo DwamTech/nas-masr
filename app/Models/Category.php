@@ -21,10 +21,6 @@ class Category extends Model
             return null;
         }
 
-        // لو انت مخزنها في storage/app/public/categories
-        return asset('storage/categories/' . $this->icon);
-
-        // ولو حاططها في public/categories مباشرة
-        // return asset('categories/' . $this->icon);
+        return asset('storage/uploads/categories/' . $this->icon);
     }
 }
