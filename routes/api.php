@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\categoryController;
 use App\Http\Controllers\Admin\CategoryFieldsController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CarController;
@@ -13,7 +14,11 @@ use App\Http\Controllers\ListingController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('v1/test', fn() => response()->json(['ok' => true]));
+
+// Public Category Fields Route
 Route::get('category-fields', [CategoryFieldsController::class, 'index']);
+// Public Categories Route
+Route::get('categories', [categoryController::class, 'index']);
 
 Route::prefix('v1/{section}')->group(function () {
 
@@ -43,9 +48,16 @@ Route::prefix('v1/{section}')->group(function () {
 Route::prefix('admin')
     ->middleware(['auth:sanctum', 'admin'])
     ->group(function () {
+        // Category Fields Routes
         Route::post('category-fields', [CategoryFieldsController::class, 'store']);
         Route::put('category-fields/{categoryField}', [CategoryFieldsController::class, 'update']);
         Route::delete('category-fields/{categoryField}', [CategoryFieldsController::class, 'destroy']);
+
+        // Category Routes
+        Route::post('categories', [CategoryController::class, 'store']);
+        Route::put('categories/{category}', [CategoryController::class, 'update']);
+        Route::delete('categories/{category}', [CategoryController::class, 'destroy']);
+
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);
