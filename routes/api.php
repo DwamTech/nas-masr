@@ -4,7 +4,7 @@ use App\Http\Controllers\Admin\categoryController;
 use App\Http\Controllers\Admin\CategoryFieldsController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CarController;
-use App\Http\Controllers\api\UserController;
+use App\Http\Controllers\Api\UserController;
 use App\Support\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
