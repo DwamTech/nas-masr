@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Listing;
 
 
 class User extends Authenticatable
@@ -25,7 +27,10 @@ class User extends Authenticatable
         'password',
         'phone',
         'email_verified_at',
-        'referral_code'
+        'referral_code',
+        'lat',
+        'lng',
+        'status'
     ];
 
     /**
@@ -49,5 +54,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function listings(): HasMany
+    {
+        return $this->hasMany(Listing::class);
     }
 }

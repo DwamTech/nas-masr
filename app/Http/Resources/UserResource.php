@@ -18,6 +18,7 @@ class UserResource extends JsonResource
             'id' => $this->id,
             // 'UserName' => $this->name,
             'phone' => $this->phone,
+            'role'=>$this->role,
             'referral_code' => $this->agent_number?$this->agent_number:null,
             'created_at' => $this->created_at?->format('Y-m-d H:i'),
         ];

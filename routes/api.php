@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ListingController;
 use App\Http\Controllers\SystemSettingController;
+use App\Http\Controllers\Admin\StatsController;
 
 
 
@@ -21,7 +22,10 @@ Route::get('category-fields', [CategoryFieldsController::class, 'index']);
 // Public Categories Route
 Route::get('categories', [categoryController::class, 'index']);
 
-Route::get('/system-settings',[SystemSettingController::class,'index']);
+Route::get('/system-settings', [SystemSettingController::class, 'index']);
+
+//public listing for specific user
+Route::get('users/{user}', [UserController::class, 'showUserWithListings']);
 
 Route::prefix('v1/{section}')->group(function () {
 
@@ -64,6 +68,19 @@ Route::prefix('admin')
         // System Settings Routes
         // Route::apiResource('system-settings', SystemSettingController::class);
 
+        // Admin Stats Route
+        Route::get('stats', [StatsController::class, 'index']);
+        Route::get('recent-activities', [StatsController::class, 'recentActivities']);
+        Route::get('users-summary', [StatsController::class, 'usersSummary']);
+
+        // Admin Users management
+    Route::get('users/{user}', [UserController::class, 'showUserWithListings']);
+    Route::put('users/{user}', [UserController::class, 'updateUser']);
+    Route::post('users', [UserController::class, 'storeUser']);
+    Route::delete('users/{user}', [UserController::class, 'deleteUser']);
+        Route::patch('users/{user}/block', [UserController::class, 'blockedUser']);
+        // Route::get('users/{user}/listings', [UserController::class, 'userListings']);
+
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);
@@ -75,7 +92,5 @@ Route::middleware('auth:sanctum')->post('/add-car', [CarController::class, 'stor
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [UserController::class, 'logout']);
     Route::get('/get-profile', [UserController::class, 'getUserProfile']);
-
 });
-
 

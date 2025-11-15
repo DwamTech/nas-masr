@@ -13,13 +13,41 @@ class SystemSettingsSeeder extends Seeder
      */
     public function run(): void
     {
+        $now = now();
+
+        // 1) رقم الدعم
         DB::table('system_settings')->updateOrInsert(
-            ['id' => 1],
+            ['key' => 'support_number'],
             [
-                'support_number' => '+971 54 519 4553',
-                'panner_image'   => 'storage/uploads/banner/53228567cbfa1e8ef884e31013cba35dffde42d3.png',
-                'created_at'     => now(),
-                'updated_at'     => now(),
+                'value'       => '+971 54 519 4553',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'رقم الدعم الفني',
+                'meta'        => json_encode([
+                    'placeholder' => '+971 ...',
+                    'icon' => 'phone'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        // 2) صورة البانر
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'panner_image'],
+            [
+                'value'       => 'storage/uploads/banner/53228567cbfa1e8ef884e31013cba35dffde42d3.png',
+                'type'        => 'string',
+                'group'       => 'appearance',
+                'label'       => 'صورة البانر الرئيسية',
+                'meta'        => json_encode([
+                    'input' => 'file',
+                    'preview' => true,
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
             ]
         );
     }

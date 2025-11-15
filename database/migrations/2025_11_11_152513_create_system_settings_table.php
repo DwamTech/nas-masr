@@ -13,8 +13,17 @@ return new class extends Migration
     {
         Schema::create('system_settings', function (Blueprint $table) {
             $table->id();
-            $table->string('support_number')->nullable();
-            $table->string('panner_image')->nullable();
+            $table->string('key', 191)->unique();
+
+            $table->text('value')->nullable();
+
+            $table->string('type', 50)->default('string');
+            $table->string('group', 191)->default('general');
+            $table->string('label')->nullable();
+            $table->json('meta')->nullable();
+
+            $table->boolean('autoload')->default(true);
+
             $table->timestamps();
         });
     }
