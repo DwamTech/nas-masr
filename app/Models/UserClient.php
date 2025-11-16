@@ -22,7 +22,7 @@ class UserClient extends Model
         return $this->belongsTo(User::class);
     }
 
-   
+
     public function getClientsListAttribute(): array
     {
         return $this->clients ?? [];
@@ -37,7 +37,7 @@ class UserClient extends Model
         $this->save();
     }
 
-    
+
     public function removeClient(int $clientId): void
     {
         $clients = $this->clients ?? [];

@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Listing;
 use App\Models\User;
+use App\Models\UserClient;
+use Faker\Provider\UserAgent;
+use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Message;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,6 +22,7 @@ class UserController extends Controller
     public function getUserProfile()
     {
         $user = Auth::user();
+        $code = UserClient::where('user_id', $user->id)->first();
 
         if (!$user) {
             return response([
@@ -28,7 +32,8 @@ class UserController extends Controller
 
         return response([
             'message' => 'Profile fetched successfully',
-            'data' => $user
+            'data' => $user,
+            'code' => $code->user_id ?? null
         ], 200);
     }
 
@@ -45,17 +50,41 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'phone' => ['sometimes', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id)],
-            'password' => ['sometimes', 'string', 'min:8'],
+            'password' => ['sometimes', 'string'],
             'lat' => ['sometimes', 'nullable', 'numeric'],
             'lng' => ['sometimes', 'nullable', 'numeric'],
             'referral_code' => ['sometimes', 'nullable', 'string'],
+            'address' => ['sometimes', 'nullable', 'string'],
         ]);
 
+        if (!empty($validated['referral_code'])) {
+            $code = UserClient::where('user_id', $validated['referral_code'])->first();
+            if (!$code) {
+                return response([
+                    'message' => 'Referral code not found'
+                ], 404);
+            }
+            $clients = $code->clients ?? [];
+
+
+            if (in_array($user->id, $clients)) {
+                return response()->json([
+                    "message" => "You have already used this referral code."
+                ]);
+            }
+
+            $clients[] = $user->id;
+
+
+            $code->clients = $clients;
+            $code->save();
+        }
         $user->update($validated);
 
         return response([
             'message' => 'Profile updated successfully',
-            'data' => $user->fresh()
+            'data' => $user->fresh(),
+
         ], 200);
     }
 
@@ -266,5 +295,32 @@ class UserController extends Controller
             'listings_count' => $user->listings_count ?? $user->listings()->count(),
             'role' => $user->role ?? 'user',
         ];
+    }
+
+
+    //create agent code
+
+    public function storeAgent(Request $request)
+    {
+        $code = UserClient::create([
+            'user_id' => request()->user()->id,
+            // 'client_code'=>strtoupper(Str::random(10)),
+        ]);
+
+        return response()->json([
+            'message' => 'Agent code created successfully',
+            'data' => $code
+        ]);
+    }
+
+    //get clients 
+    public function allClients(Request $request)
+    {
+        $user = $request->user();
+        $Client = UserClient::where('user_id',$user->id)->with('user')->get();
+        return response()->json([
+            'message' => 'Clients retrieved successfully',
+            'data' => $Client
+        ]);
     }
 }

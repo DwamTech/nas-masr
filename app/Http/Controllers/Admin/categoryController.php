@@ -12,13 +12,15 @@ class categoryController extends Controller
 {
     public function index(Request $request)
     {
-        $q = Category::query()->orderBy('sort_order')->orderBy('id');
+        $q = Category::query()
+            ->where('is_active', true) 
+            ->orderBy('sort_order', 'asc');
 
         if ($request->filled('active')) {
             $q->where('is_active', (bool) $request->boolean('active'));
         }
 
-        return CategoryResource::collection($q->where('is_active', true)->get());
+        return CategoryResource::collection($q->get());
     }
 
     // POST /api/admin/categories
