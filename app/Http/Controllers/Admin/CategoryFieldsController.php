@@ -7,6 +7,9 @@ use App\Http\Requests\Admin\StoreCategoryFieldRequest;
 use App\Http\Requests\Admin\UpdateCategoryFieldRequest;
 use App\Models\Category;
 use App\Models\CategoryField;
+use App\Models\Governorate;
+use App\Models\Make;
+use App\Support\Section;
 use Illuminate\Http\Request;
 
 class CategoryFieldsController extends Controller
@@ -14,16 +17,38 @@ class CategoryFieldsController extends Controller
     // GET /api/admin/category-fields?category_slug=cars
     public function index(Request $request)
     {
-        $q = CategoryField::query()->orderBy('category_slug')->orderBy('sort_order');
+        $q = CategoryField::query()
+            ->orderBy('category_slug')
+            ->orderBy('sort_order');
 
         if ($slug = $request->query('category_slug')) {
             $q->where('category_slug', $slug);
         }
 
+        $fields = $q->get();
+
+        $governorates = Governorate::with('cities')->get();
+
+        $section = $slug ? Section::fromSlug($slug) : null;
+
+        $supportsMakeModel = $section?->supportsMakeModel() ?? false;
+
+        $makes = [];
+        if ($supportsMakeModel) {
+            $makes = Make::with('models')->get();
+        }
+
         return response()->json([
-            'data' => $q->get(),
+            'data' => $fields,
+
+            'governorates' => $governorates,
+
+            'makes' => $supportsMakeModel ? $makes : [],
+
+            'supports_make_model' => $supportsMakeModel,
         ]);
     }
+
 
     // POST /api/admin/category-fields
     public function store(StoreCategoryFieldRequest $request)

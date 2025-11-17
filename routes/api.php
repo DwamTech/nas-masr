@@ -97,6 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [UserController::class, 'logout']);
     Route::get('/get-profile', [UserController::class, 'getUserProfile']);
     Route::put('/edit-profile', [UserController::class, 'editProfile']);
+    Route::get('/my-ads', [UserController::class, 'myAds']);
     Route::post('/create-agent-code', [UserController::class, 'storeAgent']);
     Route::get('/all-clients', [UserController::class, 'allClients']);
 });

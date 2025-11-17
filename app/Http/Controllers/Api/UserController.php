@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ListingResource;
 use App\Models\Listing;
 use App\Models\User;
 use App\Models\UserClient;
+use App\Support\Section;
 use Illuminate\Support\Facades\Auth;
 
 use Illuminate\Http\Request;
@@ -83,6 +85,46 @@ class UserController extends Controller
             'data' => $user->fresh(),
 
         ], 200);
+    }
+
+    //my ads 
+    public function myAds(Request $request)
+    {
+        $user = $request->user();
+        $slug = $request->query('category_slug');
+        $categoryId = null;
+        // $supportsMakeModel = false;
+
+        if ($slug) {
+            $section = Section::fromSlug($slug);
+            $categoryId = $section->id();
+            // $supportsMakeModel = $section->supportsMakeModel();
+        }
+
+        // Build query
+        $q = Listing::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'Valid')
+            ->orderBy('rank', 'desc')
+            ->orderBy('published_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->with(['attributes', 'governorate', 'city','make', 'model']);
+
+        if ($categoryId) {
+            $q->where('category_id', $categoryId);
+        }
+
+        // if ($supportsMakeModel) {
+        //     $q->with(['make', 'model']);
+        // }
+
+        $items = $q->get();
+
+        return ListingResource::collection($items)
+            ->additional([
+                'category_slug' => $slug,
+                // 'supports_make_model' => $supportsMakeModel,
+            ]);
     }
 
 
@@ -314,7 +356,7 @@ class UserController extends Controller
     public function allClients(Request $request)
     {
         $user = $request->user();
-        $Client = UserClient::where('user_id',$user->id)->with('user')->get();
+        $Client = UserClient::where('user_id', $user->id)->with('user')->get();
         return response()->json([
             'message' => 'Clients retrieved successfully',
             'data' => $Client
