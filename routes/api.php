@@ -89,6 +89,9 @@ Route::prefix('admin')
         Route::put('/change-password/{user}', [AuthController::class, 'changePass']);
         //create otp
         Route::post('/create-otp/{user}', [UserController::class, 'createOtp']);
+
+        //system settings
+        Route::post('/system-settings', [SystemSettingController::class, 'store']);
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);

@@ -183,14 +183,28 @@ class UserController extends Controller
     {
         $user->loadCount('listings');
 
-        $perPage = $request->query('per_page');
-        $statusFilter = $request->query('status'); // Optional: Valid/Pending/Rejected/Expired
+        // params
+        $singleSlug = $request->query('category_slug') ?? $request->query('slug');
+        $multiSlugs = $request->query('category_slugs') ?? $request->query('slugs'); // "a,b,c"
+        $statusFilter = $request->query('status'); // Valid / Pending / Rejected / Expired
+        $perPage = (int) ($request->query('per_page') ?? 20);
         $all = filter_var($request->query('all', false), FILTER_VALIDATE_BOOLEAN);
+
+        // جهّز مصفوفة slugs
+        $slugs = [];
+        if ($singleSlug) {
+            $slugs[] = trim($singleSlug);
+        }
+        if ($multiSlugs) {
+            $extra = array_map('trim', explode(',', $multiSlugs));
+            $slugs = array_values(array_filter(array_merge($slugs, $extra)));
+        }
 
         $query = Listing::query()
             ->leftJoin('categories', 'listings.category_id', '=', 'categories.id')
             ->where('listings.user_id', $user->id)
             ->when($statusFilter, fn($q) => $q->where('listings.status', $statusFilter))
+            ->when(!empty($slugs), fn($q) => $q->whereIn('categories.slug', $slugs))
             ->select([
                 'listings.id',
                 'listings.title',
@@ -198,64 +212,62 @@ class UserController extends Controller
                 'listings.status',
                 'listings.created_at',
                 'categories.name as category_name',
+                'categories.slug as category_slug',
             ])
-            ->orderByDesc('listings.created_at')
-            ->orderByDesc('listings.created_at');
+            ->orderByDesc('listings.created_at'); // (شلت التكرار)
 
         $mapStatus = function ($status) {
             return match ($status) {
-                'Valid' => 'منشور',
+                'Valid'   => 'منشور',
                 'Pending' => 'قيد المراجعة',
                 'Rejected' => 'مرفوض',
                 'Expired' => 'منتهي',
-                default => $status,
+                default   => $status,
             };
         };
 
         if ($all && !$perPage) {
             $rows = $query->get();
-            $items = $rows->map(function ($row) use ($mapStatus) {
-                return [
-                    'id' => $row['id'],
-                    'title' => $row['title'],
-                    'image' => $row['main_image'],
-                    'section' => $row['category_name'],
-                    'status' => $mapStatus($row['status']),
-                    'published_at' => $row['created_at'] ? (string) $row['created_at'] : null,
-                ];
-            })->values();
+            $items = $rows->map(fn($row) => [
+                'id'           => $row['id'],
+                'title'        => $row['title'],
+                'image'        => $row['main_image'],
+                'section'      => $row['category_name'],
+                'section_slug' => $row['category_slug'],
+                'status'       => $mapStatus($row['status']),
+                'published_at' => $row['created_at'] ? (string) $row['created_at'] : null,
+            ])->values();
 
             return response()->json([
-                'user' => $this->formatUserSummary($user),
+                'user'     => $this->formatUserSummary($user),
                 'listings' => $items,
-                'meta' => ['total' => count($items)],
+                'meta'     => ['total' => $items->count()],
             ]);
         }
 
-        $perPage = (int) ($perPage ?? 20);
         $listings = $query->paginate($perPage);
-        $items = collect($listings->items())->map(function ($row) use ($mapStatus) {
-            return [
-                'id' => $row['id'],
-                'title' => $row['title'],
-                'image' => $row['main_image'],
-                'section' => $row['category_name'],
-                'status' => $mapStatus($row['status']),
-                'published_at' => $row['created_at'] ? (string) $row['created_at'] : null,
-            ];
-        })->values();
+        $items = collect($listings->items())->map(fn($row) => [
+            'id'           => $row['id'],
+            'title'        => $row['title'],
+            'image'        => $row['main_image'],
+            'section'      => $row['category_name'],
+            'section_slug' => $row['category_slug'],
+            'status'       => $mapStatus($row['status']),
+            'published_at' => $row['created_at'] ? (string) $row['created_at'] : null,
+        ])->values();
 
         return response()->json([
-            'user' => $this->formatUserSummary($user),
+            'user'     => $this->formatUserSummary($user),
             'listings' => $items,
-            'meta' => [
-                'page' => $listings->currentPage(),
-                'per_page' => $listings->perPage(),
-                'total' => $listings->total(),
+            'meta'     => [
+                'page'      => $listings->currentPage(),
+                'per_page'  => $listings->perPage(),
+                'total'     => $listings->total(),
                 'last_page' => $listings->lastPage(),
             ],
         ]);
     }
+
 
     // Admin: Create user
     public function storeUser(Request $request)
