@@ -50,5 +50,141 @@ class SystemSettingsSeeder extends Seeder
                 'updated_at'  => $now,
             ]
         );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'privacy_policy'],
+            [
+                'value'       => '',
+                'type'        => 'text',
+                'group'       => 'general',
+                'label'       => 'سياسة الخصوصية',
+                'meta'        => json_encode([
+                    'input' => 'rich_text',
+                    'icon' => 'shield'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'terms_conditions-main_'],
+            [
+                'value'       => '',
+                'type'        => 'text',
+                'group'       => 'general',
+                'label'       => 'الشروط والأحكام',
+                'meta'        => json_encode([
+                    'input' => 'rich_text',
+                    'icon' => 'document'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'sub_support_number'],
+            [
+                'value'       => '',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'رقم الدعم الفرعي',
+                'meta'        => json_encode([
+                    'placeholder' => '+20 ...',
+                    'icon' => 'phone'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'emergency_number'],
+            [
+                'value'       => '',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'رقم الطوارئ',
+                'meta'        => json_encode([
+                    'placeholder' => '+20 ...',
+                    'icon' => 'alert'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'facebook'],
+            [
+                'value'       => '',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'فيسبوك',
+                'meta'        => json_encode([
+                    'input' => 'url',
+                    'icon' => 'facebook'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'twitter'],
+            [
+                'value'       => '',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'تويتر',
+                'meta'        => json_encode([
+                    'input' => 'url',
+                    'icon' => 'twitter'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'instagram'],
+            [
+                'value'       => '',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'إنستغرام',
+                'meta'        => json_encode([
+                    'input' => 'url',
+                    'icon' => 'instagram'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'email'],
+            [
+                'value'       => '',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'البريد الإلكتروني',
+                'meta'        => json_encode([
+                    'input' => 'email',
+                    'icon' => 'mail'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
     }
 }

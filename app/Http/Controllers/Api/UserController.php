@@ -196,10 +196,10 @@ class UserController extends Controller
                 'listings.title',
                 'listings.main_image',
                 'listings.status',
-                'listings.published_at',
+                'listings.created_at',
                 'categories.name as category_name',
             ])
-            ->orderByDesc('listings.published_at')
+            ->orderByDesc('listings.created_at')
             ->orderByDesc('listings.created_at');
 
         $mapStatus = function ($status) {
@@ -221,7 +221,7 @@ class UserController extends Controller
                     'image' => $row['main_image'],
                     'section' => $row['category_name'],
                     'status' => $mapStatus($row['status']),
-                    'published_at' => $row['published_at'] ? (string) $row['published_at'] : null,
+                    'published_at' => $row['created_at'] ? (string) $row['created_at'] : null,
                 ];
             })->values();
 
@@ -241,7 +241,7 @@ class UserController extends Controller
                 'image' => $row['main_image'],
                 'section' => $row['category_name'],
                 'status' => $mapStatus($row['status']),
-                'published_at' => $row['published_at'] ? (string) $row['published_at'] : null,
+                'published_at' => $row['created_at'] ? (string) $row['created_at'] : null,
             ];
         })->values();
 
