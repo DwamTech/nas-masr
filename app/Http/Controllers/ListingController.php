@@ -11,6 +11,7 @@ use App\Traits\HasRank;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class ListingController extends Controller
 {
@@ -143,7 +144,16 @@ class ListingController extends Controller
         $datePath = now()->format('Y/m');
         $dir = "uploads/{$section}/{$datePath}/" . ($bucket === 'main' ? 'main' : 'gallery');
         $name = Str::uuid()->toString() . '.' . $file->getClientOriginalExtension();
-
-        return $file->storeAs($dir, $name, 'public');
+        Storage::disk('public')->makeDirectory($dir);
+        $path = $file->storeAs($dir, $name, 'public');
+        if (!$path) {
+            $field = $bucket === 'main' ? 'main_image' : 'images';
+            throw \Illuminate\Validation\ValidationException::withMessages([$field => ['فشل رفع الملف.']]);
+        }
+        if (!Storage::disk('public')->exists($path)) {
+            $field = $bucket === 'main' ? 'main_image' : 'images';
+            throw \Illuminate\Validation\ValidationException::withMessages([$field => ['فشل حفظ الملف.']]);
+        }
+        return $path;
     }
 }

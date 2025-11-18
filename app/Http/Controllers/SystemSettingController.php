@@ -7,59 +7,127 @@ use App\Models\SystemSetting;
 
 class SystemSettingController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    protected array $allowedKeys = [
+        'support_number',
+        'panner_image',
+        'privacy_policy',
+        'terms_conditions-main_',
+        'sub_support_number',
+        'emergency_number',
+        'facebook',
+        'twitter',
+        'instagram',
+        'email',
+    ];
+
+    protected function rules(): array
+    {
+        return [
+            'support_number'     => ['nullable','string','max:255'],
+            'sub_support_number' => ['nullable','string','max:255'],
+            'emergency_number'   => ['nullable','string','max:255'],
+            'panner_image'       => ['nullable','string','max:1024'],
+            'privacy_policy'     => ['nullable','string'],
+            'terms_conditions-main_' => ['nullable','string'],
+            'facebook'           => ['nullable','url','max:1024'],
+            'twitter'            => ['nullable','url','max:1024'],
+            'instagram'          => ['nullable','url','max:1024'],
+            'email'              => ['nullable','email','max:255'],
+        ];
+    }
+
+    protected function typeForKey(string $key): string
+    {
+        return in_array($key, ['privacy_policy','terms_conditions-main_'], true) ? 'text' : 'string';
+    }
+
+    protected function groupForKey(string $key): string
+    {
+        return $key === 'panner_image' ? 'appearance' : 'general';
+    }
+
     public function index()
     {
-        return response()->json(SystemSetting::all());
+        $rows = SystemSetting::whereIn('key', $this->allowedKeys)->get();
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row->key] = $row->value;
+        }
+        foreach ($this->allowedKeys as $k) {
+            if (!array_key_exists($k, $map)) {
+                $map[$k] = null;
+            }
+        }
+        return response()->json($map);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'support_number' => ['nullable','string','max:255'],
-            'panner_image'   => ['nullable','string','max:255'],
-        ]);
+        $validated = $request->validate($this->rules());
 
-        $setting = SystemSetting::create($validated);
-        return response()->json($setting, 201);
+        $payload = collect($validated)
+            ->only($this->allowedKeys)
+            ->filter(fn($v) => $v !== null)
+            ->all();
+
+        foreach ($payload as $key => $value) {
+            SystemSetting::updateOrCreate(
+                ['key' => $key],
+                [
+                    'value'    => (string) $value,
+                    'type'     => $this->typeForKey($key),
+                    'group'    => $this->groupForKey($key),
+                    'autoload' => true,
+                ]
+            );
+        }
+
+        return response()->json(['status' => 'ok']);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(string $id)
     {
-        $setting = SystemSetting::findOrFail($id);
-        return response()->json($setting);
+        $row = SystemSetting::where('key', $id)->first();
+        if (!$row) {
+            $row = SystemSetting::find($id);
+        }
+        if (!$row || !in_array($row->key, $this->allowedKeys, true)) {
+            abort(404);
+        }
+        return response()->json([$row->key => $row->value]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, string $id)
     {
-        $validated = $request->validate([
-            'support_number' => ['nullable','string','max:255'],
-            'panner_image'   => ['nullable','string','max:255'],
-        ]);
+        $validated = $request->validate($this->rules());
 
-        $setting = SystemSetting::findOrFail($id);
-        $setting->update($validated);
-        return response()->json($setting);
+        $payload = collect($validated)
+            ->only($this->allowedKeys)
+            ->filter(fn($v) => $v !== null)
+            ->all();
+
+        foreach ($payload as $key => $value) {
+            SystemSetting::updateOrCreate(
+                ['key' => $key],
+                [
+                    'value'    => (string) $value,
+                    'type'     => $this->typeForKey($key),
+                    'group'    => $this->groupForKey($key),
+                    'autoload' => true,
+                ]
+            );
+        }
+
+        return response()->json(['status' => 'ok']);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
-        $setting = SystemSetting::findOrFail($id);
-        $setting->delete();
-        return response()->json(null, 204);
+        $row = SystemSetting::where('key', $id)->first();
+        if ($row && in_array($row->key, $this->allowedKeys, true)) {
+            $row->delete();
+            return response()->json(null, 204);
+        }
+        abort(404);
     }
 }

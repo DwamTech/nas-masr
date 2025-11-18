@@ -9,7 +9,17 @@ class SystemSetting extends Model
     protected $table = 'system_settings';
 
     protected $fillable = [
-        'support_number',
-        'panner_image',
+        'key',
+        'value',
+        'type',
+        'group',
+        'label',
+        'meta',
+        'autoload',
+    ];
+
+    protected $casts = [
+        'meta' => 'array',
+        'autoload' => 'boolean',
     ];
 }
