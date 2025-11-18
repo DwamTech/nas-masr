@@ -85,6 +85,10 @@ Route::prefix('admin')
         //Best Advertiser
         Route::post('/featured', [BestAdvertiserController::class, 'store']);
         Route::put('/disable/{bestAdvertiser}', [BestAdvertiserController::class, 'disable']);
+        //change  password
+        Route::put('/change-password/{user}', [AuthController::class, 'changePass']);
+        //create otp
+        Route::post('/create-otp/{user}', [UserController::class, 'createOtp']);
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);
@@ -95,6 +99,8 @@ Route::middleware('auth:sanctum')->post('/add-car', [CarController::class, 'stor
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [UserController::class, 'logout']);
+    //verify otp
+    Route::post('/verify-otp', [UserController::class, 'verifyOtp']);
     Route::get('/get-profile', [UserController::class, 'getUserProfile']);
     Route::put('/edit-profile', [UserController::class, 'editProfile']);
     Route::get('/my-ads', [UserController::class, 'myAds']);

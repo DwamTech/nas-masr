@@ -108,7 +108,7 @@ class UserController extends Controller
             ->orderBy('rank', 'desc')
             ->orderBy('published_at', 'desc')
             ->orderBy('id', 'desc')
-            ->with(['attributes', 'governorate', 'city','make', 'model']);
+            ->with(['attributes', 'governorate', 'city', 'make', 'model']);
 
         if ($categoryId) {
             $q->where('category_id', $categoryId);
@@ -361,5 +361,31 @@ class UserController extends Controller
             'message' => 'Clients retrieved successfully',
             'data' => $Client
         ]);
+    }
+
+
+    //create admin otp
+    public function createOtp(User $user)
+    {
+        $otp = rand(100000, 999999);
+        $user->otp = $otp;
+        $user->save();
+        return response()->json(['message' => 'Otp created successfully', 'otp' => $otp]);
+    }
+
+    //user verify otp
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'otp' => 'required|string',
+        ]);
+
+        $user = User::where('id', $request->user()->id)->first();
+        if ($user->otp != $request->otp) {
+            return response()->json(['message' => 'Invalid otp'], 401);
+        }
+        $user->otp_verified = true;
+        $user->save();
+        return response()->json(['message' => 'Otp verified successfully']);
     }
 }

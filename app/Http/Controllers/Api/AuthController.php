@@ -83,4 +83,15 @@ class AuthController extends Controller
             'token' => $token,
         ], 201);
     }
+
+
+    // admin change  password
+    public function changePass(User $user)
+    {
+
+        $user->password = Hash::make('123456789');
+        $user->save();
+        return response()->json(['message' => 'Password changed successfully']);
+    }
+
 }
