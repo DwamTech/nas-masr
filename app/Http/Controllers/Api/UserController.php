@@ -183,7 +183,7 @@ class UserController extends Controller
     // }
 
     // Admin: Show user with listings combined
-   public function showUserWithListings(User $user, Request $request)
+  public function showUserWithListings(User $user, Request $request)
 {
     $user->loadCount('listings');
 
@@ -218,7 +218,6 @@ class UserController extends Controller
             'listings.whatsapp_phone',
             'listings.plan_type',
             'listings.created_at',
-
             'categories.slug as category_slug',
         ])
         ->orderByDesc('listings.created_at');
@@ -226,7 +225,7 @@ class UserController extends Controller
     // بدون Pagination: رجّع الكل
     $rows = $query->get();
 
-    // حوِّل لكل عنصر الـ minimal payload المطلوب
+    // حوِّل لكل عنصر الـ minimal payload المطلوب + category بالعربي/الإنجليزي
     $items = $rows->map(function ($row) {
         // attributes كاملة (EAV)
         $attrs = [];
@@ -240,10 +239,19 @@ class UserController extends Controller
         $govName  = ($row->relationLoaded('governorate') && $row->governorate) ? $row->governorate->name : null;
         $cityName = ($row->relationLoaded('city') && $row->city) ? $row->city->name : null;
 
+        // بيانات القسم (slug + name)
+        $catSlug = $row->category_slug;
+        $catName = null;
+        if ($row->category_id) {
+            $sec = Section::fromId($row->category_id);
+            $catSlug = $sec?->slug ?? $catSlug;
+            $catName = $sec?->name ?? null;
+        }
+
         // make/model حسب القسم
         $supportsMakeModel = false;
         if ($row->category_id) {
-            $sec = Section::fromId($row->category_id); // أو Section::fromSlug($row->category_slug)
+            $sec = Section::fromId($row->category_id);
             $supportsMakeModel = $sec?->supportsMakeModel() ?? false;
         }
 
@@ -257,6 +265,10 @@ class UserController extends Controller
             'main_image_url'  => $row->main_image ? asset('storage/' . $row->main_image) : null,
             'created_at'      => $row->created_at,
             'plan_type'       => $row->plan_type,
+
+            // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
+            'category'        => $catSlug,
+            'category_name'   => $catName,
         ];
 
         if ($supportsMakeModel) {
@@ -273,6 +285,7 @@ class UserController extends Controller
         'meta'     => ['total' => $items->count()], // بدون pagination
     ]);
 }
+
 
 protected function castEavValueRow($attr)
 {

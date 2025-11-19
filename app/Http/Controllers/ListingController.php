@@ -24,7 +24,7 @@ class ListingController extends Controller
     public function index(string $section, Request $request): \Illuminate\Http\JsonResponse
     {
         $sec = Section::fromSlug($section);
-        $typesByKey = Listing::typesByKeyForSection($sec);
+        $typesByKey = \App\Models\Listing::typesByKeyForSection($sec);
 
         $filterableKeys = collect($sec->fields)
             ->where('filterable', true)
@@ -38,7 +38,7 @@ class ListingController extends Controller
             $with[] = 'model';
         }
 
-        $q = Listing::query()
+        $q = \App\Models\Listing::query()
             ->forSection($sec)
             ->with($with)
             ->orderByDesc('rank')
@@ -84,7 +84,7 @@ class ListingController extends Controller
         // بدون Pagination: رجّع الكل
         $rows = $q->get();
 
-        // زيّدي views لكل النتائج (تجميعيًا وبالشُحنات لتفادي استعلام ضخم واحد)
+        // زيّدي views لكل النتائج (بالشُحنات)
         if ($rows->isNotEmpty()) {
             $ids = $rows->pluck('id');
             $ids->chunk(1000)->each(function ($chunk) {
@@ -95,9 +95,11 @@ class ListingController extends Controller
         }
 
         $supportsMakeModel = $sec->supportsMakeModel();
+        $categorySlug = $sec->slug;
+        $categoryName = $sec->name;
 
-        // نبني الـ payload المصغّر المطلوب فقط
-        $items = $rows->map(function ($item) use ($supportsMakeModel) {
+        // بناء الـ payload المصغّر المطلوب
+        $items = $rows->map(function ($item) use ($supportsMakeModel, $categorySlug, $categoryName) {
             // attributes (EAV) كاملة
             $attrs = [];
             if ($item->relationLoaded('attributes')) {
@@ -116,6 +118,10 @@ class ListingController extends Controller
                 'main_image_url'  => $item->main_image ? asset('storage/' . $item->main_image) : null,
                 'created_at'      => $item->created_at,
                 'plan_type'       => $item->plan_type,
+
+                // الكاتيجري
+                'category'        => $categorySlug,   // slug
+                'category_name'   => $categoryName,   // الاسم
             ];
 
             if ($supportsMakeModel) {
@@ -130,9 +136,7 @@ class ListingController extends Controller
         return response()->json($items);
     }
 
-    /**
-     * نفس منطق تحويل قيمة الـ EAV كما في الـ Resource
-     */
+    /** نفس منطق قراءة قيمة الـ EAV */
     protected function castEavValueRow($attr)
     {
         return $attr->value_int

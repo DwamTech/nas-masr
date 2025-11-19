@@ -57,7 +57,7 @@ class BestAdvertiserController extends Controller
         // Collect listing IDs so we can eager load them
         $listingIds = collect($rows)->pluck('id')->all();
 
-        // زوّدنا المحافظه/المدينة فقط عشان نقرأ أسماءهم
+        // eager load
         $listings = \App\Models\Listing::with([
             'attributes',
             'make',
@@ -66,7 +66,7 @@ class BestAdvertiserController extends Controller
             'city',
         ])->whereIn('id', $listingIds)->get()->keyBy('id');
 
-        // Group by user — مع إخراج minimal + attributes + price
+        // Group by user — Minimal + attributes + price + category fields
         $byUser = [];
         foreach ($rows as $row) {
             $listing = $listings[$row->id] ?? null;
@@ -79,12 +79,25 @@ class BestAdvertiserController extends Controller
                     }
                 }
 
+                // أسماء المحافظة/المدينة
+                $govName  = ($listing->relationLoaded('governorate') && $listing->governorate) ? $listing->governorate->name : null;
+                $cityName = ($listing->relationLoaded('city') && $listing->city) ? $listing->city->name : null;
+
+                // القسم الحالي لهذا الإعلان
+                $lSec = $listing->category_id ? Section::fromId($listing->category_id) : null;
+                $catSlug = $lSec?->slug ?? null;
+                $catName = $lSec?->name ?? null;
+
                 $byUser[$row->user_id][] = [
                     'main_image_url' => $listing->main_image ? asset('storage/' . $listing->main_image) : null,
-                    'governorate'    => ($listing->relationLoaded('governorate') && $listing->governorate) ? $listing->governorate->name : null,
-                    'city'           => ($listing->relationLoaded('city') && $listing->city) ? $listing->city->name : null,
+                    'governorate'    => $govName,
+                    'city'           => $cityName,
                     'price'          => $listing->price,
                     'attributes'     => $attrs,
+
+                    // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
+                    'category'       => $catSlug,
+                    'category_name'  => $catName,
                 ];
             }
         }
@@ -104,6 +117,7 @@ class BestAdvertiserController extends Controller
 
         return response()->json(['advertisers' => $out]);
     }
+
     protected function castEavValueRow($attr)
     {
         return $attr->value_int
