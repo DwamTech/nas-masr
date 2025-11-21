@@ -5,71 +5,66 @@ namespace App\Http\Controllers;
 use App\Http\Requests\GenericListingRequest;
 use App\Http\Resources\ListingResource;
 use App\Models\Listing;
+use App\Models\SystemSetting;
 use App\Services\ListingService;
 use App\Support\Section;
 use App\Traits\HasRank;
+use App\Traits\PackageHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+
 
 class ListingController extends Controller
 {
-    use HasRank;
+    use HasRank, PackageHelper;
 
 
 
-    public function index(string $section, Request $request): \Illuminate\Http\JsonResponse
+    public function index(string $section, Request $request)
     {
         $sec = Section::fromSlug($section);
-        $typesByKey = \App\Models\Listing::typesByKeyForSection($sec);
+        $typesByKey = Listing::typesByKeyForSection($sec);
 
         $filterableKeys = collect($sec->fields)
             ->where('filterable', true)
             ->pluck('field_name')
             ->all();
 
-        // Eager load بحسب دعم make/model
         $with = ['attributes', 'governorate', 'city'];
         if ($sec->supportsMakeModel()) {
             $with[] = 'make';
             $with[] = 'model';
         }
 
-        $q = \App\Models\Listing::query()
+        $q = Listing::query()
             ->forSection($sec)
             ->with($with)
+            ->active()
             ->orderByDesc('rank')
             ->keyword($request->query('q'))
             ->filterGovernorate($request->query('governorate_id'), $request->query('governorate'))
             ->filterCity($request->query('city_id'), $request->query('city'))
             ->priceRange($request->query('price_min'), $request->query('price_max'));
 
-        if ($request->filled('status')) {
-            $q->statusIs($request->query('status'));
-        } else {
-            $q->active();
-        }
-
         if ($plan = $request->query('plan_type')) {
-            if (Schema::hasColumn('listings', 'plan_type')) {
-                $q->where('plan_type', $plan);
-            }
+
+            $q->where('plan_type', $plan);
         }
 
-        // attr = مساواة
         $attrEq = (array) $request->query('attr', []);
         $attrEq = array_intersect_key($attrEq, array_flip($filterableKeys));
         $q->attrEq($attrEq, $typesByKey);
 
-        // attr_in = مجموعة قيم
         $attrIn = (array) $request->query('attr_in', []);
         $attrIn = array_intersect_key($attrIn, array_flip($filterableKeys));
         $q->attrIn($attrIn, $typesByKey);
 
-        // attr_min / attr_max = مدى
+
         $attrMin = (array) $request->query('attr_min', []);
         $attrMax = (array) $request->query('attr_max', []);
         $attrMin = array_intersect_key($attrMin, array_flip($filterableKeys));
@@ -81,7 +76,7 @@ class ListingController extends Controller
         $attrLike = array_intersect_key($attrLike, array_flip($filterableKeys));
         $q->attrLike($attrLike);
 
-        // بدون Pagination: رجّع الكل
+
         $rows = $q->get();
 
         // زيّدي views لكل النتائج (بالشُحنات)
@@ -98,7 +93,7 @@ class ListingController extends Controller
         $categorySlug = $sec->slug;
         $categoryName = $sec->name;
 
-        // بناء الـ payload المصغّر المطلوب
+
         $items = $rows->map(function ($item) use ($supportsMakeModel, $categorySlug, $categoryName) {
             // attributes (EAV) كاملة
             $attrs = [];
@@ -132,7 +127,6 @@ class ListingController extends Controller
             return $data;
         })->values();
 
-        // نرجّع بدون Pagination
         return response()->json($items);
     }
 
@@ -159,12 +153,22 @@ class ListingController extends Controller
 
 
 
-    public function store(string $section, GenericListingRequest $request, ListingService $service): ListingResource
+    public function store(string $section, GenericListingRequest $request, ListingService $service)
     {
         $sec = Section::fromSlug($section);
         $data = $request->validated();
 
         $sec = Section::fromSlug($section);
+        $packageResult = $this->consumeForPlan($request->user()->id, $data['plan_type']);
+
+
+        if ($data['plan_type'] != 'free') {
+            if(!$packageResult['success']){
+                return response()->json($packageResult);
+            }
+        }
+
+
 
         $rank = $this->getNextRank(Listing::class, $sec->id());
         $data['rank'] = $rank;
@@ -178,6 +182,19 @@ class ListingController extends Controller
             }
             $data['images'] = $stored;
         }
+        $manualApprove = Cache::remember('settings:manual_approval', now()->addHours(6), function () {
+            $val = SystemSetting::where('key', 'manual_approval')->value('value');
+            return (int)$val === 1;
+        });
+        if ($manualApprove) {
+            $data['status'] = 'Pending';
+            $data['admin_approved'] = false;
+        } else {
+            $data['status']         = 'Valid';
+            $data['admin_approved'] = true;
+            $data['published_at']   = now();
+        }
+
 
         $listing = $service->create($sec, $data, $request->user()->id ?? 1);
 

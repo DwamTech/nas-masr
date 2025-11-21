@@ -36,6 +36,12 @@ class ListingService
                 'published_at',
                 'rank',
                 'country_code',
+                'plan_type',
+                'contact_phone',
+                'whatsapp_phone',
+                'make_id',
+                'admin_approved',
+                'model_id',
             ]);
 
             $listing = Listing::create($common + [
@@ -74,6 +80,12 @@ class ListingService
                 'published_at',
                 'rank',
                 'country_code',
+                'plan_type',
+                'contact_phone',
+                'whatsapp_phone',
+                // 'admin_approved',
+                'make_id',
+                'model_id',
             ]));
 
             if (array_key_exists('attributes', $data)) {
@@ -202,5 +214,4 @@ class ListingService
             }
         }
     }
-
 }

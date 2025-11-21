@@ -7,12 +7,15 @@ use App\Http\Resources\ListingResource;
 use App\Models\Listing;
 use App\Models\User;
 use App\Models\UserClient;
+use App\Models\UserPackages;
 use App\Support\Section;
 use Illuminate\Support\Facades\Auth;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Carbon;
+
 
 class UserController extends Controller
 {
@@ -92,7 +95,7 @@ class UserController extends Controller
     {
         $user = $request->user();
         $slug = $request->query('category_slug');
-        $status=$request->query('status');
+        $status = $request->query('status');
         $categoryId = null;
         // $supportsMakeModel = false;
 
@@ -114,8 +117,8 @@ class UserController extends Controller
         if ($categoryId) {
             $q->where('category_id', $categoryId);
         }
-        if($status){
-            $q->where('status',$status);
+        if ($status) {
+            $q->where('status', $status);
         }
 
         // if ($supportsMakeModel) {
@@ -129,6 +132,46 @@ class UserController extends Controller
                 'category_slug' => $slug,
                 // 'supports_make_model' => $supportsMakeModel,
             ]);
+    }
+
+
+    public function myPackages(Request $request)
+    {
+        $user = $request->user();
+        $pkg  = UserPackages::where('user_id', $user->id)->first();
+
+        $makeCardLite = function (string $titleAr, bool $active, ?\Illuminate\Support\Carbon $expiresAt): array {
+            return [
+                'title'              => $titleAr,
+                'badge_text'         => $active ? 'نشط' : 'منتهي',
+                'expires_at_human'   => $expiresAt?->translatedFormat('d/m/Y'),
+                'note'               => $expiresAt
+                    ? 'تنتهي صلاحية الإعلانات والباقة بتاريخ ' . $expiresAt->translatedFormat('d/m/Y')
+                    : null,
+            ];
+        };
+
+        if (!$pkg) {
+            return response()->json([
+                'packages' => [
+                    $makeCardLite('الباقة المتميزة', false, null),
+                    $makeCardLite('الباقة الاستاندرد', false, null),
+                ],
+            ]);
+        }
+
+        $exp = $pkg->expire_date instanceof Carbon
+            ? $pkg->expire_date
+            : ($pkg->expire_date ? Carbon::parse($pkg->expire_date) : null);
+
+        $isActive = ($exp === null) || $exp->isFuture();
+
+        return response()->json([
+            'packages' => [
+                $makeCardLite('الباقة المتميزة', $isActive && $pkg->featured_ads_remaining > 0, $exp),
+                $makeCardLite('الباقة الاستاندرد', $isActive && $pkg->standard_ads_remaining > 0, $exp),
+            ],
+        ]);
     }
 
 
@@ -183,129 +226,129 @@ class UserController extends Controller
     // }
 
     // Admin: Show user with listings combined
-  public function showUserWithListings(User $user, Request $request)
-{
-    $user->loadCount('listings');
+    public function showUserWithListings(User $user, Request $request)
+    {
+        $user->loadCount('listings');
 
-    // params
-    $singleSlug  = $request->query('category_slug') ?? $request->query('slug');
-    $multiSlugs  = $request->query('category_slugs') ?? $request->query('slugs'); // "a,b,c"
-    $statusFilter= $request->query('status'); // Valid / Pending / Rejected / Expired
+        // params
+        $singleSlug  = $request->query('category_slug') ?? $request->query('slug');
+        $multiSlugs  = $request->query('category_slugs') ?? $request->query('slugs'); // "a,b,c"
+        $statusFilter = $request->query('status'); // Valid / Pending / Rejected / Expired
 
-    // جهّز مصفوفة slugs
-    $slugs = [];
-    if ($singleSlug) {
-        $slugs[] = trim($singleSlug);
-    }
-    if ($multiSlugs) {
-        $extra  = array_map('trim', explode(',', $multiSlugs));
-        $slugs  = array_values(array_filter(array_merge($slugs, $extra)));
-    }
+        // جهّز مصفوفة slugs
+        $slugs = [];
+        if ($singleSlug) {
+            $slugs[] = trim($singleSlug);
+        }
+        if ($multiSlugs) {
+            $extra  = array_map('trim', explode(',', $multiSlugs));
+            $slugs  = array_values(array_filter(array_merge($slugs, $extra)));
+        }
 
-    // نفس منطق الاستعلام، مع eager-load للعلاقات المطلوبة
-    $query = Listing::query()
-        ->leftJoin('categories', 'listings.category_id', '=', 'categories.id')
-        ->with(['attributes', 'governorate', 'city', 'make', 'model'])
-        ->where('listings.user_id', $user->id)
-        ->when($statusFilter, fn ($q) => $q->where('listings.status', $statusFilter))
-        ->when(!empty($slugs), fn ($q) => $q->whereIn('categories.slug', $slugs))
-        ->select([
-            'listings.id',
-            'listings.category_id',
-            'listings.main_image',
-            'listings.price',
-            'listings.contact_phone',
-            'listings.whatsapp_phone',
-            'listings.plan_type',
-            'listings.created_at',
-            'categories.slug as category_slug',
-        ])
-        ->orderByDesc('listings.created_at');
+        // نفس منطق الاستعلام، مع eager-load للعلاقات المطلوبة
+        $query = Listing::query()
+            ->leftJoin('categories', 'listings.category_id', '=', 'categories.id')
+            ->with(['attributes', 'governorate', 'city', 'make', 'model'])
+            ->where('listings.user_id', $user->id)
+            ->when($statusFilter, fn($q) => $q->where('listings.status', $statusFilter))
+            ->when(!empty($slugs), fn($q) => $q->whereIn('categories.slug', $slugs))
+            ->select([
+                'listings.id',
+                'listings.category_id',
+                'listings.main_image',
+                'listings.price',
+                'listings.contact_phone',
+                'listings.whatsapp_phone',
+                'listings.plan_type',
+                'listings.created_at',
+                'categories.slug as category_slug',
+            ])
+            ->orderByDesc('listings.created_at');
 
-    // بدون Pagination: رجّع الكل
-    $rows = $query->get();
+        // بدون Pagination: رجّع الكل
+        $rows = $query->get();
 
-    // حوِّل لكل عنصر الـ minimal payload المطلوب + category بالعربي/الإنجليزي
-    $items = $rows->map(function ($row) {
-        // attributes كاملة (EAV)
-        $attrs = [];
-        if ($row->relationLoaded('attributes')) {
-            foreach ($row->attributes as $attr) {
-                $attrs[$attr->key] = $this->castEavValueRow($attr);
+        // حوِّل لكل عنصر الـ minimal payload المطلوب + category بالعربي/الإنجليزي
+        $items = $rows->map(function ($row) {
+            // attributes كاملة (EAV)
+            $attrs = [];
+            if ($row->relationLoaded('attributes')) {
+                foreach ($row->attributes as $attr) {
+                    $attrs[$attr->key] = $this->castEavValueRow($attr);
+                }
             }
-        }
 
-        // أسماء المحافظة/المدينة
-        $govName  = ($row->relationLoaded('governorate') && $row->governorate) ? $row->governorate->name : null;
-        $cityName = ($row->relationLoaded('city') && $row->city) ? $row->city->name : null;
+            // أسماء المحافظة/المدينة
+            $govName  = ($row->relationLoaded('governorate') && $row->governorate) ? $row->governorate->name : null;
+            $cityName = ($row->relationLoaded('city') && $row->city) ? $row->city->name : null;
 
-        // بيانات القسم (slug + name)
-        $catSlug = $row->category_slug;
-        $catName = null;
-        if ($row->category_id) {
-            $sec = Section::fromId($row->category_id);
-            $catSlug = $sec?->slug ?? $catSlug;
-            $catName = $sec?->name ?? null;
-        }
+            // بيانات القسم (slug + name)
+            $catSlug = $row->category_slug;
+            $catName = null;
+            if ($row->category_id) {
+                $sec = Section::fromId($row->category_id);
+                $catSlug = $sec?->slug ?? $catSlug;
+                $catName = $sec?->name ?? null;
+            }
 
-        // make/model حسب القسم
-        $supportsMakeModel = false;
-        if ($row->category_id) {
-            $sec = Section::fromId($row->category_id);
-            $supportsMakeModel = $sec?->supportsMakeModel() ?? false;
-        }
+            // make/model حسب القسم
+            $supportsMakeModel = false;
+            if ($row->category_id) {
+                $sec = Section::fromId($row->category_id);
+                $supportsMakeModel = $sec?->supportsMakeModel() ?? false;
+            }
 
-        $data = [
-            'attributes'      => $attrs,
-            'governorate'     => $govName,
-            'city'            => $cityName,
-            'price'           => $row->price,
-            'contact_phone'   => $row->contact_phone,
-            'whatsapp_phone'  => $row->whatsapp_phone,
-            'main_image_url'  => $row->main_image ? asset('storage/' . $row->main_image) : null,
-            'created_at'      => $row->created_at,
-            'plan_type'       => $row->plan_type,
+            $data = [
+                'attributes'      => $attrs,
+                'governorate'     => $govName,
+                'city'            => $cityName,
+                'price'           => $row->price,
+                'contact_phone'   => $row->contact_phone,
+                'whatsapp_phone'  => $row->whatsapp_phone,
+                'main_image_url'  => $row->main_image ? asset('storage/' . $row->main_image) : null,
+                'created_at'      => $row->created_at,
+                'plan_type'       => $row->plan_type,
 
-            // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
-            'category'        => $catSlug,
-            'category_name'   => $catName,
-        ];
+                // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
+                'category'        => $catSlug,
+                'category_name'   => $catName,
+            ];
 
-        if ($supportsMakeModel) {
-            $data['make']  = ($row->relationLoaded('make')  && $row->make)  ? $row->make->name  : null;
-            $data['model'] = ($row->relationLoaded('model') && $row->model) ? $row->model->name : null;
-        }
+            if ($supportsMakeModel) {
+                $data['make']  = ($row->relationLoaded('make')  && $row->make)  ? $row->make->name  : null;
+                $data['model'] = ($row->relationLoaded('model') && $row->model) ? $row->model->name : null;
+            }
 
-        return $data;
-    })->values();
+            return $data;
+        })->values();
 
-    return response()->json([
-        // 'user'     => $this->formatUserSummary($user),
-        'listings' => $items,
-        'meta'     => ['total' => $items->count()], // بدون pagination
-    ]);
-}
+        return response()->json([
+            // 'user'     => $this->formatUserSummary($user),
+            'listings' => $items,
+            'meta'     => ['total' => $items->count()], // بدون pagination
+        ]);
+    }
 
 
-protected function castEavValueRow($attr)
-{
-    return $attr->value_int
-        ?? $attr->value_decimal
-        ?? $attr->value_bool
-        ?? $attr->value_string
-        ?? $this->decodeJsonSafe($attr->value_json)
-        ?? $attr->value_date
-        ?? null;
-}
+    protected function castEavValueRow($attr)
+    {
+        return $attr->value_int
+            ?? $attr->value_decimal
+            ?? $attr->value_bool
+            ?? $attr->value_string
+            ?? $this->decodeJsonSafe($attr->value_json)
+            ?? $attr->value_date
+            ?? null;
+    }
 
-protected function decodeJsonSafe($json)
-{
-    if (is_null($json)) return null;
-    if (is_array($json)) return $json;
+    protected function decodeJsonSafe($json)
+    {
+        if (is_null($json)) return null;
+        if (is_array($json)) return $json;
 
-    $x = json_decode($json, true);
-    return json_last_error() === JSON_ERROR_NONE ? $x : $json;
-}
+        $x = json_decode($json, true);
+        return json_last_error() === JSON_ERROR_NONE ? $x : $json;
+    }
 
 
     // Admin: Create user

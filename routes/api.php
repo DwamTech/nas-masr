@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\categoryController;
 use App\Http\Controllers\Admin\CategoryFieldsController;
+use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CarController;
 use App\Http\Controllers\Api\UserController;
@@ -98,6 +99,8 @@ Route::prefix('admin')
 
         //system settings
         Route::post('/system-settings', [SystemSettingController::class, 'store']);
+        //User packages
+        Route::post('/user-packages', [PackagesController::class, 'storeOrUpdate']);
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);
@@ -113,6 +116,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/get-profile', [UserController::class, 'getUserProfile']);
     Route::put('/edit-profile', [UserController::class, 'editProfile']);
     Route::get('/my-ads', [UserController::class, 'myAds']);
+    Route::get('/my-packages',[UserController::class,'myPackages']);
     Route::post('/create-agent-code', [UserController::class, 'storeAgent']);
     Route::get('/all-clients', [UserController::class, 'allClients']);
 });

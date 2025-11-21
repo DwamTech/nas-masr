@@ -6,6 +6,8 @@ use App\Support\Section;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+
 
 class Listing extends Model
 {
@@ -32,14 +34,18 @@ class Listing extends Model
         'model_id',
         'rank',
         'country_code',
+        'views',
+        'admin_approved'
     ];
 
     protected $casts = [
         'images' => 'array',
         'published_at' => 'datetime',
+        'admin_approved'=>'boolean',
         'price' => 'decimal:2',
         'lat' => 'decimal:7',
         'lng' => 'decimal:7',
+        'views'=>'int'
     ];
 
     /* ===================== العلاقات ===================== */
@@ -144,7 +150,7 @@ class Listing extends Model
         if ($govName !== null && trim($govName) !== '') {
             $norm = self::normalizeArabic($govName);
 
-            $ids = \DB::table('governorates')
+            $ids = DB::table('governorates')
                 ->get()
                 ->filter(function ($row) use ($norm) {
                     return self::normalizeArabic($row->name) === $norm;
@@ -167,7 +173,7 @@ class Listing extends Model
         }
 
         if ($cityName !== null && trim($cityName) !== '') {
-            $cityQuery = \DB::table('cities')->where('name', 'like', '%' . trim($cityName) . '%');
+            $cityQuery = DB::table('cities')->where('name', 'like', '%' . trim($cityName) . '%');
 
             if (method_exists($q, '_govIds')) {
                 $govIds = $q->_govIds();

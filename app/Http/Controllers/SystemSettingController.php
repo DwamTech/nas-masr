@@ -21,10 +21,11 @@ class SystemSettingController extends Controller
         'email',
         'featured_users_count',
         'show_phone',
+        'manual_approval'
     ];
 
     // مفاتيح حسب النوع
-    protected array $booleanKeys = ['show_phone'];
+    protected array $booleanKeys = ['show_phone','manual_approval'];
     protected array $integerKeys = ['featured_users_count'];
 
     protected function rules(): array
@@ -42,6 +43,7 @@ class SystemSettingController extends Controller
             'email'                 => ['nullable', 'email', 'max:255'],
             'show_phone'            => ['nullable', 'boolean'],
             'featured_users_count'  => ['nullable', 'integer', 'min:0', 'max:100'],
+            'manual_approval'=>['nullable','boolean']
         ];
     }
 

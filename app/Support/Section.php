@@ -69,7 +69,7 @@ final class Section
 
     public function supportsMakeModel(): bool
     {
-        return in_array($this->slug, ['cars', 'cars_rent'], true);
+        return in_array($this->slug, ['cars', 'cars_rent','spare-parts'], true);
     }
 
     public function supportsContact(): bool
@@ -98,6 +98,7 @@ final class Section
             'contact_phone' => ['nullable', 'string', 'max:20'],
             'whatsapp_phone' => ['nullable', 'string', 'max:20'],
             'country_code' => ['nullable', 'string', 'max:20'],
+            'admin_approved' => ['nullable', 'boolean'],
             // 'make_id' => ['nullable', 'integer', 'exists:makes,id'],
             // 'model_id' => ['nullable', 'integer', 'exists:models,id'],
             // 'make' => ['nullable', 'string'],

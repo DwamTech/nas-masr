@@ -187,45 +187,64 @@ class SystemSettingsSeeder extends Seeder
             ]
         );
 
-       
-DB::table('system_settings')->updateOrInsert(
-    ['key' => 'featured_users_count'],
-    [
-        'value'       => '8',              // القيمة الافتراضية
-        'type'        => 'integer',
-        'group'       => 'home',
-        'label'       => 'عدد المستخدمين المميزين',
-        'meta'        => json_encode([
-            'input' => 'number',
-            'min'   => 0,
-            'max'   => 100,
-            'step'  => 1,
-            'hint'  => 'يُستخدم لتحديد عدد المستخدمين المميزين الظاهرين في الصفحة الرئيسية'
-        ]),
-        'autoload'    => true,
-        'created_at'  => $now,
-        'updated_at'  => $now,
-    ]
-);
 
-// إظهار رقم الهاتف في الإعلانات
-DB::table('system_settings')->updateOrInsert(
-    ['key' => 'show_phone'],
-    [
-        'value'       => '1', // 1=إظهار، 0=إخفاء
-        'type'        => 'boolean',
-        'group'       => 'privacy',
-        'label'       => 'إظهار رقم الهاتف في الإعلانات',
-        'meta'        => json_encode([
-            'input'       => 'switch',
-            'true_label'  => 'إظهار',
-            'false_label' => 'إخفاء',
-            'icon'        => 'phone'
-        ]),
-        'autoload'    => true,
-        'created_at'  => $now,
-        'updated_at'  => $now,
-    ]
-);
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'featured_users_count'],
+            [
+                'value'       => '8',              // القيمة الافتراضية
+                'type'        => 'integer',
+                'group'       => 'home',
+                'label'       => 'عدد المستخدمين المميزين',
+                'meta'        => json_encode([
+                    'input' => 'number',
+                    'min'   => 0,
+                    'max'   => 100,
+                    'step'  => 1,
+                    'hint'  => 'يُستخدم لتحديد عدد المستخدمين المميزين الظاهرين في الصفحة الرئيسية'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        // إظهار رقم الهاتف في الإعلانات
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'show_phone'],
+            [
+                'value'       => '1', // 1=إظهار، 0=إخفاء
+                'type'        => 'boolean',
+                'group'       => 'privacy',
+                'label'       => 'إظهار رقم الهاتف في الإعلانات',
+                'meta'        => json_encode([
+                    'input'       => 'switch',
+                    'true_label'  => 'إظهار',
+                    'false_label' => 'إخفاء',
+                    'icon'        => 'phone'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'manual_approval'],
+            [
+                'value'       => '0', 
+                'type'        => 'boolean',
+                'group'       => 'moderation',
+                'label'       => 'تفعيل الموافقة اليدوية على الإعلانات',
+                'meta'        => json_encode([
+                    'input'       => 'switch',
+                    'true_label'  => 'مفعّل',
+                    'false_label' => 'معطّل',
+                    'icon'        => 'shield-check'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
     }
 }
