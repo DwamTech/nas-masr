@@ -17,42 +17,43 @@ class GenericListingRequest extends FormRequest
     {
         $section = $this->resolveSection();
 
+        // قواعد الإنشاء (تجي من السكشن وفيها required)
         $rules = $section->rules();
-        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            foreach ($rules as $key => $ruleSet) {
-                if (str_starts_with($key, 'attributes.')) {
 
-                    if (is_string($ruleSet)) {
-                        $ruleSet = explode('|', $ruleSet);
-                    }
-
-                    $ruleSet = collect($ruleSet)
-                        ->reject(fn($r) => $r === 'required')
-                        ->prepend('sometimes')
-                        ->toArray();
-
-                    $rules[$key] = $ruleSet;
-                }
-            }
-
-
-        }
-
+        // قواعد إضافية عامة
         $extra = [
-            'status' => ['nullable', Rule::in(['draft', 'published', 'archived'])],
+            // خليه يتماشى مع حالتك الفعلية بدل draft/published/archived
+            'status'       => ['nullable', Rule::in(['Valid', 'Pending', 'Rejected', 'Expired'])],
             'published_at' => ['nullable', 'date'],
-
-            // 'plan_type'    => ['nullable', 'string', 'max:50'],
         ];
+
         if ($section->supportsMakeModel()) {
             $extra['make_id'] = ['nullable', 'integer', 'exists:makes,id'];
             $extra['model_id'] = ['nullable', 'integer', 'exists:models,id'];
-            $extra['make'] = ['nullable', 'string'];
-            $extra['model'] = ['nullable', 'string'];
+            $extra['make']    = ['nullable', 'string'];
+            $extra['model']   = ['nullable', 'string'];
         }
 
+        $rules = $rules + $extra;
 
-        return $rules + $extra;
+        // --- وضع التعديل: حوّل كل required -> sometimes
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            foreach ($rules as $key => $ruleSet) {
+                $rules[$key] = $this->relaxRuleSet($ruleSet);
+            }
+
+            // صور/ملفات: ضيف sometimes|nullable
+            foreach (['main_image', 'images', 'images.*'] as $fileKey) {
+                if (isset($rules[$fileKey])) {
+                    $rules[$fileKey] = $this->ensureSometimesNullable($rules[$fileKey]);
+                }
+            }
+
+            // plan_type في التعديل اختياري
+            $rules['plan_type'] = ['sometimes', 'string', 'in:standard,premium,featured,free'];
+        }
+
+        return $rules;
     }
 
     protected function prepareForValidation(): void
@@ -82,6 +83,7 @@ class GenericListingRequest extends FormRequest
                 }
             }
         }
+
         if (isset($data['attributes']['kilometers']) && is_string($data['attributes']['kilometers'])) {
             $data['attributes']['kilometers'] = str_replace(',', '،', $data['attributes']['kilometers']);
         }
@@ -95,32 +97,29 @@ class GenericListingRequest extends FormRequest
 
     public function attributes(): array
     {
-
-
         $attrs = [
-            'title' => 'العنوان',
-            'price' => 'السعر',
-            'description' => 'الوصف',
-            'governorate_id' => 'المحافظة',
-            'city_id' => 'المدينة',
-            'governorate' => 'المحافظة',
-            'city' => 'المدينة',
-            'lat' => 'خط العرض',
-            'lng' => 'خط الطول',
-            'address' => 'العنوان',
-            'main_image' => 'الصورة الرئيسية',
-            'images' => 'معرض الصور',
-            'images.*' => 'الصورة',
-            'status' => 'الحالة',
-            'published_at' => 'تاريخ النشر',
-            'plan_type' => 'نوع الخطة',
-            'contact_phone' => 'رقم الاتصال',
-            'whatsapp_phone' => 'رقم الواتساب',
-            'make_id' => 'الماركة',
-            'model_id' => 'الموديل',
-            'make' => 'الماركة',
-            'model' => 'الموديل',
-
+            'title'            => 'العنوان',
+            'price'            => 'السعر',
+            'description'      => 'الوصف',
+            'governorate_id'   => 'المحافظة',
+            'city_id'          => 'المدينة',
+            'governorate'      => 'المحافظة',
+            'city'             => 'المدينة',
+            'lat'              => 'خط العرض',
+            'lng'              => 'خط الطول',
+            'address'          => 'العنوان',
+            'main_image'       => 'الصورة الرئيسية',
+            'images'           => 'معرض الصور',
+            'images.*'         => 'الصورة',
+            'status'           => 'الحالة',
+            'published_at'     => 'تاريخ النشر',
+            'plan_type'        => 'نوع الخطة',
+            'contact_phone'    => 'رقم الاتصال',
+            'whatsapp_phone'   => 'رقم الواتساب',
+            'make_id'          => 'الماركة',
+            'model_id'         => 'الموديل',
+            'make'             => 'الماركة',
+            'model'            => 'الموديل',
         ];
 
         try {
@@ -138,14 +137,14 @@ class GenericListingRequest extends FormRequest
     {
         $msgs = [
             'required' => 'حقل :attribute مطلوب.',
-            'integer' => 'حقل :attribute يجب أن يكون عددًا صحيحًا.',
-            'numeric' => 'حقل :attribute يجب أن يكون رقمًا.',
-            'boolean' => 'حقل :attribute يجب أن يكون نعم/لا.',
-            'date' => 'حقل :attribute يجب أن يكون تاريخًا صحيحًا.',
-            'in' => 'قيمة :attribute غير ضمن القيم المسموح بها.',
-            'max' => 'طول :attribute أكبر من المسموح.',
-            'exists' => ':attribute غير موجود.',
-            'array' => 'حقل :attribute يجب أن يكون قائمة.',
+            'integer'  => 'حقل :attribute يجب أن يكون عددًا صحيحًا.',
+            'numeric'  => 'حقل :attribute يجب أن يكون رقمًا.',
+            'boolean'  => 'حقل :attribute يجب أن يكون نعم/لا.',
+            'date'     => 'حقل :attribute يجب أن يكون تاريخًا صحيحًا.',
+            'in'       => 'قيمة :attribute غير ضمن القيم المسموح بها.',
+            'max'      => 'طول :attribute أكبر من المسموح.',
+            'exists'   => ':attribute غير موجود.',
+            'array'    => 'حقل :attribute يجب أن يكون قائمة.',
             'distinct' => 'حقل :attribute يحتوي عناصر مكرّرة.',
         ];
 
@@ -175,12 +174,51 @@ class GenericListingRequest extends FormRequest
 
     protected function resolveSection(): Section
     {
-        $param = $this->route('section'); // string أو Section
-
+        $param = $this->route('section'); 
         if ($param instanceof Section) {
             return $param;
         }
-
         return Section::fromSlug((string) $param);
+    }
+
+    // ======= Helpers =======
+
+
+    protected function relaxRuleSet($ruleSet): array
+    {
+        if (is_string($ruleSet)) {
+            $ruleSet = explode('|', $ruleSet);
+        }
+
+        $ruleSet = array_values(array_filter($ruleSet, function ($r) {
+            $r = (string)$r;
+            if ($r === 'required') return false;
+            if (str_starts_with($r, 'required_if')) return false;
+            if (str_starts_with($r, 'required_unless')) return false;
+            return true;
+        }));
+
+        array_unshift($ruleSet, 'sometimes');
+
+        return $ruleSet;
+    }
+
+    
+    protected function ensureSometimesNullable($ruleSet): array
+    {
+        if (is_string($ruleSet)) {
+            $ruleSet = explode('|', $ruleSet);
+        }
+
+        if (!in_array('sometimes', $ruleSet, true)) {
+            array_unshift($ruleSet, 'sometimes');
+        }
+        if (!in_array('nullable', $ruleSet, true)) {
+            array_unshift($ruleSet, 'nullable');
+        }
+
+        $ruleSet = array_values(array_filter($ruleSet, fn($r) => $r !== 'required'));
+
+        return $ruleSet;
     }
 }

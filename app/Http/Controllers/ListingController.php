@@ -160,10 +160,12 @@ class ListingController extends Controller
 
     public function store(string $section, GenericListingRequest $request, ListingService $service)
     {
+        $user = $request->user();
         $sec = Section::fromSlug($section);
         $data = $request->validated();
 
         $sec = Section::fromSlug($section);
+
 
         if ($data['plan_type'] != 'free') {
             $packageResult = $this->consumeForPlan($request->user()->id, $data['plan_type']);
@@ -200,7 +202,8 @@ class ListingController extends Controller
         }
 
 
-        $listing = $service->create($sec, $data, $request->user()->id ?? 1);
+        $listing = $service->create($sec, $data, $user->id);
+        $user->role = 'advertiser';
 
         return new ListingResource($listing->load(['attributes', 'governorate', 'city', 'make', 'model']));
     }

@@ -333,6 +333,8 @@ class UserController extends Controller
                 'listings.whatsapp_phone',
                 'listings.plan_type',
                 'listings.created_at',
+                'listings.governorate_id',
+                'listings.city_id',
                 'categories.slug as category_slug',
 
             ])
