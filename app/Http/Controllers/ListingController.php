@@ -115,6 +115,10 @@ class ListingController extends Controller
                 'plan_type'       => $item->plan_type,
                 'views'           => $item->views,
                 'rank'            => $item->rank,
+                'id' => $item->id,
+                'lat' => $item->lat,
+                'lng' => $item->lng,
+
                 // الكاتيجري
                 'category'        => $categorySlug,   // slug
                 'category_name'   => $categoryName,   // الاسم

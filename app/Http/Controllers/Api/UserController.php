@@ -9,7 +9,10 @@ use App\Models\User;
 use App\Models\UserClient;
 use App\Models\UserPackages;
 use App\Support\Section;
+use App\Traits\HasRank;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -20,6 +23,7 @@ use Illuminate\Support\Carbon;
 class UserController extends Controller
 {
     //
+    use HasRank;
 
     public function getUserProfile()
     {
@@ -174,6 +178,70 @@ class UserController extends Controller
         ]);
     }
 
+    //   public function makeRankOne(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'category' => ['required', 'string'], // slug
+    //         'ad_id'    => ['required', 'integer'],
+    //     ]);
+
+    //     // حدد القسم من الـ slug
+    //     $sec = Section::fromSlug($validated['category']);
+    //     $categoryId = $sec->id();
+
+    //     // هات الإعلان وتأكد إنه تبع نفس القسم
+    //     $ad = Listing::where('id', $validated['ad_id'])
+    //         ->where('category_id', $categoryId)
+    //         ->first();
+
+    //     if (!$ad) {
+    //         return response()->json([
+    //             'status'  => false,
+    //             'message' => 'الإعلان غير موجود في هذا القسم.',
+    //         ], 404);
+    //     }
+
+    //     // السماح فقط لمالك الإعلان (أو أدمن لو حابب تضيف سماحية)
+    //     $user = $request->user();
+    //     if ($ad->user_id !== ($user->id ?? null)) {
+    //         return response()->json([
+    //             'status'  => false,
+    //             'message' => 'لا يمكنك تعديل ترتيب إعلان لا تملكه.',
+    //         ], 403);
+    //     }
+
+    //     // كاش/كوول-داون: مرة كل 24 ساعة لنفس (user, category, ad)
+    //     $cooldownHours = 24;
+    //     $cacheKey = "rank1:{$user->id}:cat{$categoryId}:ad{$ad->id}";
+    //     if (Cache::has($cacheKey)) {
+    //         $expiresAtTs = Cache::get($cacheKey);
+    //         $remaining   = max(0, $expiresAtTs - now()->timestamp);
+    //         $hrs         = (int) ceil($remaining / 3600);
+
+    //         return response()->json([
+    //             'status'  => false,
+    //             'message' => "يمكنك رفع الإعلان مرة كل 24 ساعة. المُتبقي تقريبًا: {$hrs} ساعة.",
+    //         ], 429);
+    //     }
+
+
+    //     $ok = $this->makeRankOne($categoryId, $ad->id);
+    //     if (!$ok) {
+    //         return response()->json([
+    //             'status'  => false,
+    //             'message' => 'حدث خطأ أثناء تحديث الترتيب.',
+    //         ], 500);
+    //     }
+
+    //     // ثبت الكوول-داون
+    //     $expires = now()->addHours($cooldownHours);
+    //     Cache::put($cacheKey, $expires->timestamp, $expires);
+
+    //     return response()->json([
+    //         'status'  => true,
+    //         'message' => "تم رفع الإعلان #{$ad->id} إلى الترتيب الأول في قسم {$sec->name}.",
+    //     ]);
+    // }
 
     public function logout(Request $request)
     {
@@ -257,11 +325,16 @@ class UserController extends Controller
                 'listings.category_id',
                 'listings.main_image',
                 'listings.price',
+                'listings.rank',
+                'listings.views',
+                'listings.lat',
+                'listings.lng',
                 'listings.contact_phone',
                 'listings.whatsapp_phone',
                 'listings.plan_type',
                 'listings.created_at',
                 'categories.slug as category_slug',
+
             ])
             ->orderByDesc('listings.created_at');
 
@@ -308,6 +381,13 @@ class UserController extends Controller
                 'main_image_url'  => $row->main_image ? asset('storage/' . $row->main_image) : null,
                 'created_at'      => $row->created_at,
                 'plan_type'       => $row->plan_type,
+                'id' => $row->id,
+                'lat' => $row->lat,
+                'lng' => $row->lng,
+                'rank' => $row->rank,
+                'views' => $row->views,
+
+
 
                 // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
                 'category'        => $catSlug,

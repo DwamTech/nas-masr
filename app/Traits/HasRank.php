@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Models\Listing;
 use Illuminate\Support\Facades\DB;
 
 trait HasRank
@@ -22,19 +23,24 @@ trait HasRank
     }
 
 
-    public function makeRankOne($modelClass, $adId): bool
+    public function makeRankOne($categoryId, $adId): bool
     {
-        return DB::transaction(function () use ($modelClass, $adId) {
-            $model = new $modelClass;
-            $table = $model->getTable();
-            DB::table($table)->lockForUpdate()->get();
+        return DB::transaction(function () use ($categoryId, $adId) {
+            $listing = Listing::where('id', $adId)
+                ->where('category_id', $categoryId)
+                ->first();
 
-            $ad = $modelClass::where('id', $adId)->lockForUpdate()->first();
-            if (!$ad)
+            if (!$listing) {
                 return false;
+            }
 
-            DB::table($table)->increment('rank');
-            $ad->update(['rank' => 1]);
+            Listing::where('category_id', $categoryId)
+                ->where('id', '!=', $adId)
+                ->update([
+                    'rank' => DB::raw('COALESCE(rank, 0) + 1'),
+                ]);
+
+            $listing->update(['rank' => 1]);
 
             return true;
         });

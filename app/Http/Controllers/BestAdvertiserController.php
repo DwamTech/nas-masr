@@ -96,6 +96,9 @@ class BestAdvertiserController extends Controller
                     'attributes'     => $attrs,
                     'rank'           => $listing->rank,
                     'views'          => $listing->views,
+                    'id' => $listing->id,
+                    'lat' => $listing->lat,
+                    'lng' => $listing->lng,
 
                     // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
                     'category'       => $catSlug,
