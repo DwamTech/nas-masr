@@ -6,6 +6,7 @@ use App\Http\Requests\GenericListingRequest;
 use App\Http\Resources\ListingResource;
 use App\Models\Listing;
 use App\Models\SystemSetting;
+use App\Models\User;
 use App\Services\ListingService;
 use App\Support\Section;
 use App\Traits\HasRank;
@@ -209,18 +210,37 @@ class ListingController extends Controller
         return new ListingResource($listing->load(['attributes', 'governorate', 'city', 'make', 'model']));
     }
 
-    public function show(string $section, Listing $listing): ListingResource
+    public function show(string $section, Listing $listing)
     {
         $sec = Section::fromSlug($section);
         abort_if($listing->category_id !== $sec->id(), 404);
+
+
         $listing->increment('views');
 
-        return new ListingResource($listing->load(['attributes', 'governorate', 'city', 'make', 'model']));
+
+        $owner =    User::select('id', 'name', 'created_at')->find($listing->user_id);
+        $adsCount = Listing::where('user_id', $listing->user_id)->count();
+
+        $userPayload = [
+            'id'               => $owner?->id,
+            'name'             => $owner?->name,
+            'joined_at'        => $owner?->created_at?->toIso8601String(),
+            'joined_at_human'  => $owner?->created_at?->diffForHumans(),
+            'listings_count'   => $adsCount,
+        ];
+
+
+        return (new ListingResource(
+            $listing->load(['attributes', 'governorate', 'city', 'make', 'model'])
+        ))->additional([
+            'user' => $userPayload,
+        ]);
     }
 
     protected function userIsAdmin($user): bool
     {
-        return $user->role=='admin';
+        return $user->role == 'admin';
     }
 
     public function update(string $section, GenericListingRequest $request, Listing $listing, ListingService $service)
