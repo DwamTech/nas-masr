@@ -14,21 +14,76 @@ class CitySeeder extends Seeder
      */
     public function run(): void
     {
-        $cairo = Governorate::where('name', 'القاهرة')->first();
-        $giza = Governorate::where('name', 'الجيزة')->first();
 
-        if ($cairo) {
-            City::insert([
-                ['name' => 'مدينة نصر', 'governorate_id' => $cairo->id],
-                ['name' => 'مصر الجديدة', 'governorate_id' => $cairo->id],
-            ]);
-        }
+        // اسم المحافظة => مصفوفة المدن/المراكز التابعة لها
+        $govCities = [
+            'القاهرة' => [
+                'مدينة نصر',
+                'مصر الجديدة',
+                'حلوان',
+                'المعادي',
+            ],
+            'الجيزة' => [
+                'الدقي',
+                '6 أكتوبر',
+                'الهرم',
+                'الشيخ زايد',
+            ],
+            'الإسكندرية' => [
+                'حي وسط الإسكندرية',
+                'العجمي',
+                'سموحة',
+                'برج العرب',
+            ],
+            'الدقهلية' => [
+                'المنصورة',
+                'ميت غمر',
+                'طلخا',
+                'السنبلاوين',
+            ],
+            'الشرقية' => [
+                'الزقازيق',
+                'العاشر من رمضان',
+                'بلبيس',
+                'منيا القمح',
+            ],
+            'القليوبية' => [
+                'بنها',
+                'شبرا الخيمة',
+                'قليوب',
+                'الخانكة',
+            ],
+            'أسوان' => [
+                'أسوان',
+                'إدفو',
+                'كوم أمبو',
+                'دراو',
+            ],
+            'السويس' => [
+                'السويس',
+                'الجناين',
+                'عتاقة',
+                'فيصل',
+            ],
+        ];
 
-        if ($giza) {
-            City::insert([
-                ['name' => 'الدقي', 'governorate_id' => $giza->id],
-                ['name' => '6 أكتوبر', 'governorate_id' => $giza->id],
-            ]);
+        foreach ($govCities as $govName => $cities) {
+            $gov = Governorate::where('name', $govName)->first();
+
+            if (!$gov) {
+                // لو المحافظة مش موجودة في جدول المحافظات نطنشها
+                continue;
+            }
+
+            $rows = [];
+            foreach ($cities as $cityName) {
+                $rows[] = [
+                    'name'            => $cityName,
+                    'governorate_id'  => $gov->id,
+                ];
+            }
+
+            City::insert($rows);
         }
     }
 
