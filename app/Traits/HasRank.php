@@ -42,8 +42,8 @@ trait HasRank
             Listing::where('category_id', $categoryId)
                 ->where('id', '!=', $adId)
                 ->update([
-                    'rank' => DB::raw('IFNULL(rank, 0) + 1'),
-                    'updated_at' => DB::raw("'" . now()->format('Y-m-d H:i:s') . "'"),
+                    'rank'       => DB::raw('IFNULL(`rank`, 0) + 1'),
+                    'updated_at' => now()->toDateTimeString(),
                 ]);
 
 
