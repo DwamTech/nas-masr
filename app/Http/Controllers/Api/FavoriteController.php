@@ -17,13 +17,34 @@ class FavoriteController extends Controller
 
         $rows = Favorite::query()
             ->where('user_id', $user->id)
-            ->with(['ad.attributes', 'ad.governorate', 'ad.city', 'ad.make', 'ad.model'])
+            ->with(['ad.governorate', 'ad.city'])
             ->get();
 
-        $listings = $rows->map(fn($f) => $f->ad)->filter();
+        $payload = $rows->map(function ($f) {
+            $ad = $f->ad;
+            if (!$ad) return null;
 
-        return ListingResource::collection($listings)
-            ->additional(['count' => $listings->count()]);
+            $slug = $ad->category_id ? Section::fromId($ad->category_id)->slug : null;
+
+            return [
+                'plan_type'  => $ad->plan_type,
+                'price'      => $ad->price,
+                'description'=> $ad->description,
+                'gov'        => optional($ad->governorate)->name,
+                'cite'       => optional($ad->city)->name,
+                'puplished'  => $ad->published_at,
+                'main_image' => $ad->main_image ? asset('storage/' . $ad->main_image) : null,
+                'view'       => $ad->views,
+                'id'         => $ad->id,
+                'rank'       => $ad->rank,
+                'categry'    => $slug,
+            ];
+        })->filter();
+
+        return response()->json([
+            'count' => $payload->count(),
+            'data'  => $payload->values(),
+        ]);
     }
 
     public function toggle(Request $request)
