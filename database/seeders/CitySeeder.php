@@ -4,18 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\City;
 use App\Models\Governorate;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class CitySeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-
-        // اسم المحافظة => مصفوفة المدن/المراكز التابعة لها
+        // المحافظات والمدن التابعة
         $govCities = [
             'القاهرة' => [
                 'مدينة نصر',
@@ -67,23 +62,29 @@ class CitySeeder extends Seeder
             ],
         ];
 
-        foreach ($govCities as $govName => $cities) {
-            $gov = Governorate::where('name', $govName)->first();
+        foreach ($govCities as $govName => $cityList) {
 
-            if (!$gov) {
+            // لو المحافظة مش موجودة → نتخطاها، مش هنكررها
+            $governorate = Governorate::where('name', $govName)->first();
+            if (!$governorate) {
                 continue;
             }
 
-            $rows = [];
-            foreach ($cities as $cityName) {
-                $rows[] = [
-                    'name'            => $cityName,
-                    'governorate_id'  => $gov->id,
-                ];
+            // علشان ميبقاش فيه تكرار — نعمل sync للمدن
+            foreach ($cityList as $cityName) {
+                City::updateOrCreate(
+                    [
+                        'governorate_id' => $governorate->id,
+                        'name'           => $cityName,
+                    ],
+                    [] // مفيش تحديثات تانية
+                );
             }
 
-            City::insert($rows);
+            // OPTIONAL: لو عاوز تحذف أي مدينة مش موجودة في السيدر
+            // City::where('governorate_id', $governorate->id)
+            //     ->whereNotIn('name', $cityList)
+            //     ->delete();
         }
     }
-
 }
