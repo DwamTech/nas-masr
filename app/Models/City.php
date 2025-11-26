@@ -17,6 +17,11 @@ class City extends Model
         return $this->belongsTo(Governorate::class);
     }
 
+    public function listings()
+    {
+        return $this->hasMany(Listing::class, 'city_id');
+    }
+
     public function cars()
     {
         return $this->hasMany(Car::class);

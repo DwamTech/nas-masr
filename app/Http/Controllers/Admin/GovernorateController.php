@@ -25,7 +25,7 @@ class GovernorateController extends Controller
 
         return response()->json($gov->load('cities'), 201);
     }
-    public function storCit(Request $request, Governorate $governorate)
+    public function storCities(Request $request, Governorate $governorate)
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:191', 'unique:cities,name,NULL,id,governorate_id,' . $governorate->id],
@@ -77,19 +77,19 @@ class GovernorateController extends Controller
         return response()->json($governorate->cities()->orderBy('name')->get());
     }
 
-    public function addCity(Request $request, Governorate $governorate)
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:191', 'unique:cities,name,NULL,id,governorate_id,' . $governorate->id],
-        ]);
+    // public function addCity(Request $request, Governorate $governorate)
+    // {
+    //     $data = $request->validate([
+    //         'name' => ['required', 'string', 'max:191', 'unique:cities,name,NULL,id,governorate_id,' . $governorate->id],
+    //     ]);
 
-        $city = City::create([
-            'name' => $data['name'],
-            'governorate_id' => $governorate->id,
-        ]);
+    //     $city = City::create([
+    //         'name' => $data['name'],
+    //         'governorate_id' => $governorate->id,
+    //     ]);
 
-        return response()->json($city, 201);
-    }
+    //     return response()->json($city, 201);
+    // }
 
     public function updateCity(Request $request, City $city)
     {
@@ -104,7 +104,21 @@ class GovernorateController extends Controller
 
     public function deleteCity(City $city)
     {
+
+        $adsCount = $city->listings()->count();
+
+        if ($adsCount > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن حذف المدينة لأنها مستخدمة في الإعلانات.',
+            ], 400);
+        }
+
         $city->delete();
-        return response()->json(null, 204);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم حذف المدينة بنجاح.',
+        ], 200);
     }
 }

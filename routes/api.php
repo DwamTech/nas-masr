@@ -116,7 +116,7 @@ Route::prefix('admin')
         Route::post('/city/{governorate}', [GovernorateController::class, 'storCities']);
         Route::put('governorates/{governorate}', [GovernorateController::class, 'updateGov']);
         Route::delete('governorates/{governorate}', [GovernorateController::class, 'destroyGov']);
-        Route::post('governorates/{governorate}/cities', [GovernorateController::class, 'addCity']);
+        // Route::post('governorates/{governorate}/cities', [GovernorateController::class, 'addCity']);
         Route::put('cities/{city}', [GovernorateController::class, 'updateCity']);
         Route::delete('cities/{city}', [GovernorateController::class, 'deleteCity']);
 
