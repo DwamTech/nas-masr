@@ -36,7 +36,7 @@ class CategoriesTableSeeder extends Seeder
             ['slug' => 'mens-clothes',     'name' => 'الملابس الرجاليه والاحذيه', 'icon' => 'الملابس_الرجاليه_الاحذيه.jpg'],
             ['slug' => 'watches-jewelry',  'name' => 'الساعات والمجوهرات',       'icon' => 'الساعات_المجوهرات.png'],
             ['slug' => 'free-professions', 'name' => 'المهن الحره والخدمات',      'icon' => 'المهن_الحره_الخدمات.png'],
-            ['slug' => 'kids-toys',        'name' => ' مستلزمات لعب واطفال',       'icon' => 'لعب_مستلزمات_الاطفال.png'],
+            ['slug' => 'kids-toys',        'name' => ' مستلزمات ولعب الاطفال',       'icon' => 'لعب_مستلزمات_الاطفال.png'],
             ['slug' => 'gym',              'name' => 'جيمات',                     'icon' => 'جيمات.png'],
             ['slug' => 'construction',     'name' => 'مواد البناء والتشطيبات',      'icon' => 'مواد_البناء_والتشطيب.png'],
             ['slug' => 'maintenance',      'name' => 'الصيانه العامه',            'icon' => 'الصيانه_العامه.png'],
@@ -48,7 +48,7 @@ class CategoriesTableSeeder extends Seeder
             ['slug' => 'wholesale',        'name' => 'بيع الجمله',                'icon' => 'بيع_الجمله.png'],
             ['slug' => 'production-lines', 'name' => 'مواد وخطوط الانتاج',         'icon' => 'مواد_وخطوط_الانتاج.png'],
             ['slug' => 'light-vehicles',   'name' => ' دراجات ومركبات خفيفه' ,         'icon' => 'دراجات_مركبات.png'],
-            ['slug' => 'heavy-transport',  'name' => 'نقل معدات ثقيله',           'icon' => 'نقل_معدات_ثقيله.png'],
+            ['slug' => 'heavy-transport',  'name' => 'نقل ومعدات ثقيله',           'icon' => 'نقل_معدات_ثقيله.png'],
             ['slug' => 'tools',            'name' => 'عددومستلزمات',              'icon' => 'عدد_مستلزمات.png'],
             ['slug' => 'missing',          'name' => 'مفقودين',                  'icon' => 'مفقودين.png'],
         ];
