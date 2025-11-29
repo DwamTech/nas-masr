@@ -3,17 +3,12 @@
 namespace Database\Seeders;
 
 use App\Models\CategoryField;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class CategoryFieldsSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-
         $realEstateFields = [
             [
                 'category_slug' => 'real_estate',
@@ -36,6 +31,7 @@ class CategoryFieldsSeeder extends Seeder
                 'sort_order' => 2,
             ],
         ];
+
         $carsRentFields = [
             [
                 'category_slug' => 'cars_rent',
@@ -58,28 +54,8 @@ class CategoryFieldsSeeder extends Seeder
                 'sort_order' => 4,
             ],
         ];
-        $animalsFields = [
-            [
-                'category_slug' => 'animals',
-                'field_name' => 'main_category',
-                'display_name' => 'القسم الرئيسي',
-                'type' => 'string',
-                'options' => ['طيور', 'حيوانات أليفة', 'إكسسوارات', 'أعلاف', 'أخرى'],
-                'required' => true,
-                'filterable' => true,
-                'sort_order' => 1,
-            ],
-            [
-                'category_slug' => 'animals',
-                'field_name' => 'sub_category',
-                'display_name' => 'القسم الفرعي',
-                'type' => 'string',
-                'options' => ['ببغاء', 'حمام', 'قطط', 'كلاب', 'أسماك', 'أرانب', 'معدات تربية'],
-                'required' => true,
-                'filterable' => true,
-                'sort_order' => 2,
-            ],
-        ];
+
+
         $jobsFields = [
             [
                 'category_slug' => 'jobs',
@@ -127,11 +103,11 @@ class CategoryFieldsSeeder extends Seeder
                 'category_slug' => 'jobs',
                 'field_name' => 'salary',
                 'display_name' => 'الراتب',
-                'type' => 'decimal',    // أو int حسب ما تحبي
-                'options' => [],           // مفيش اختيارات
+                'type' => 'decimal',
+                'options' => [],
                 'required' => true,
                 'filterable' => false,
-                'rules_json' => ['min:0'],    // عشان مايدخلش رقم سالب
+                'rules_json' => ['min:0'],
                 'sort_order' => 3,
             ],
             [
@@ -139,13 +115,12 @@ class CategoryFieldsSeeder extends Seeder
                 'field_name' => 'contact_via',
                 'display_name' => 'التواصل عبر',
                 'type' => 'string',
-                'options' => [],           // برضه حر
+                'options' => [],
                 'required' => true,
-                'filterable' => false,        // مش لازم أفلتر بيه
+                'filterable' => false,
                 'sort_order' => 4,
             ],
         ];
-
 
         $carFields = [
             [
@@ -224,37 +199,44 @@ class CategoryFieldsSeeder extends Seeder
             ],
         ];
 
-
-
-
+        // ✅ كل الحقول المسموح بيها
         $allFields = array_merge(
             $realEstateFields,
             $carFields,
             $carsRentFields,
-            $animalsFields,
             $jobsFields,
-            // $foodProductsFields,
-            // $homeServicesFields,
-            // $electronicsFields,
-            // $mensClothesFields,
-            // حط الجديد هنا
-
         );
 
+        // ✅ نبني قائمة بالمفاتيح المسموح بيها: category_slug + field_name
+        $allowedKeys = collect($allFields)
+            ->map(fn ($f) => $f['category_slug'] . '::' . $f['field_name'])
+            ->all();
+
+        // ✅ امسح أي حقول قديمة مش موجودة في اللي فوق
+        CategoryField::all()->each(function (CategoryField $field) use ($allowedKeys) {
+            $key = $field->category_slug . '::' . $field->field_name;
+
+            if (!in_array($key, $allowedKeys, true)) {
+                $field->delete();
+            }
+        });
+
+        // ✅ اعملي upsert / create لباقي الحقول
         foreach ($allFields as $field) {
             CategoryField::updateOrCreate(
                 [
                     'category_slug' => $field['category_slug'],
-                    'field_name' => $field['field_name'],
+                    'field_name'    => $field['field_name'],
                 ],
                 [
                     'display_name' => $field['display_name'],
-                    'type' => $field['type'] ?? 'string',
-                    'options' => $field['options'] ?? [],
-                    'required' => $field['required'] ?? true,
-                    'filterable' => $field['filterable'] ?? true,
-                    'is_active' => true,
-                    'sort_order' => $field['sort_order'] ?? 999,
+                    'type'         => $field['type'] ?? 'string',
+                    'options'      => $field['options'] ?? [],
+                    'required'     => $field['required'] ?? true,
+                    'filterable'   => $field['filterable'] ?? true,
+                    'is_active'    => true,
+                    'sort_order'   => $field['sort_order'] ?? 999,
+                    'rules_json'   => $field['rules_json'] ?? null,
                 ]
             );
         }
