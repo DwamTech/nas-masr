@@ -1349,6 +1349,63 @@ class CategoryFieldsSeeder extends Seeder
                 'sort_order' => 2,
             ],
         ];
+        // ========================
+        // الملابس الرجالية والأحذية - mens-clothes
+        // ========================
+        $mensClothesFields = [
+            [
+                'category_slug' => 'mens-clothes',
+                'field_name' => 'main_category',
+                'display_name' => 'القسم الرئيسي',
+                'type' => 'string',
+                'options' => [
+                    'ملابس رجالي صيفي',
+                    'ملابس رجالي شتوي',
+                    'أحذية رجالي',
+                    'ملابس رياضية',
+                    'بدل وملابس رسمية',
+                    'ملابس داخلية وجوارب',
+                    'إكسسوارات رجالي',
+                    'أخرى',
+                ],
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 1,
+            ],
+            [
+                'category_slug' => 'mens-clothes',
+                'field_name' => 'sub_category',
+                'display_name' => 'القسم الفرعي',
+                'type' => 'string',
+                'options' => [
+                    'تيشيرت',
+                    'قميص',
+                    'بنطلون جينز',
+                    'بنطلون قماش',
+                    'شورت',
+                    'سويت شيرت',
+                    'جاكت',
+                    'بلوفر',
+                    'بدلة كاملة',
+                    'حذاء رسمي',
+                    'حذاء كاجوال',
+                    'سنيكرز',
+                    'شبشب / صنادل',
+                    'تريننج',
+                    'بيجامة',
+                    'ملابس داخلية',
+                    'شرابات',
+                    'أحزمة',
+                    'كرافتة',
+                    'ساعات وإكسسوارات',
+                    'أخرى',
+                ],
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 2,
+            ],
+        ];
+
 
 
         $allFields = array_merge(
@@ -1363,6 +1420,7 @@ class CategoryFieldsSeeder extends Seeder
             // $mensClothesFields,
             // حط الجديد هنا
             $storesFields,
+            $mensClothesFields,
             $restaurantsFields,
             $groceriesFields,
             $homeAppliancesFields,
