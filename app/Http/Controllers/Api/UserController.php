@@ -143,17 +143,17 @@ class UserController extends Controller
     public function myPackages(Request $request)
     {
         $user = $request->user();
-        $pkg  = UserPackages::where('user_id', $user->id)->first();
+        $pkg = UserPackages::where('user_id', $user->id)->first();
 
         $makeCardLite = function (string $titleAr, bool $active, ?Carbon $expiresAt, ?int $days, int $total): array {
             return [
-                'title'            => $titleAr,
-                'badge_text'       => $active ? 'نشط' : 'منتهي',
+                'title' => $titleAr,
+                'badge_text' => $active ? 'نشط' : 'منتهي',
                 'expires_at_human' => $expiresAt?->translatedFormat('d/m/Y'),
-                'note'             => $expiresAt
+                'note' => $expiresAt
                     ? ('تنتهي صلاحية الباقة بتاريخ ' . $expiresAt->translatedFormat('d/m/Y'))
                     : (
-                        // لو الباقة بدون مدة (days = 0) وفيها رصيد، مفيش تاريخ انتهاء
+                            // لو الباقة بدون مدة (days = 0) وفيها رصيد، مفيش تاريخ انتهاء
                         ($days === 0 && $total > 0)
                         ? 'باقة بدون مدة — تعتمد على الرصيد فقط'
                         : null
@@ -172,15 +172,15 @@ class UserController extends Controller
 
         // بيانات الـ featured
         $featuredActive = (bool) $pkg->featured_active;                 // من الـ accessor بعد التعديلات
-        $featuredExp    = $pkg->featured_expire_date;                   // Carbon|null
-        $featuredDays   = (int) ($pkg->featured_days ?? 0);
-        $featuredTotal  = (int) ($pkg->featured_ads ?? 0);
+        $featuredExp = $pkg->featured_expire_date;                   // Carbon|null
+        $featuredDays = (int) ($pkg->featured_days ?? 0);
+        $featuredTotal = (int) ($pkg->featured_ads ?? 0);
 
         // بيانات الـ standard
         $standardActive = (bool) $pkg->standard_active;
-        $standardExp    = $pkg->standard_expire_date;
-        $standardDays   = (int) ($pkg->standard_days ?? 0);
-        $standardTotal  = (int) ($pkg->standard_ads ?? 0);
+        $standardExp = $pkg->standard_expire_date;
+        $standardDays = (int) ($pkg->standard_days ?? 0);
+        $standardTotal = (int) ($pkg->standard_ads ?? 0);
 
         return response()->json([
             'packages' => [
@@ -194,7 +194,7 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'category' => ['required', 'string'], // slug
-            'ad_id'    => ['required', 'integer'],
+            'ad_id' => ['required', 'integer'],
         ]);
 
         $sec = Section::fromSlug($validated['category']);
@@ -206,7 +206,7 @@ class UserController extends Controller
 
         if (!$ad) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'الإعلان غير موجود في هذا القسم.',
             ], 404);
         }
@@ -214,7 +214,7 @@ class UserController extends Controller
         $user = $request->user();
         if ($ad->user_id !== ($user->id ?? null)) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'لا يمكنك تعديل ترتيب إعلان لا تملكه.',
             ], 403);
         }
@@ -223,11 +223,11 @@ class UserController extends Controller
         $cacheKey = "rank1:{$user->id}:cat{$categoryId}:ad{$ad->id}";
         if (Cache::has($cacheKey)) {
             $expiresAtTs = Cache::get($cacheKey);
-            $remaining   = max(0, $expiresAtTs - now()->timestamp);
-            $hrs         = (int) ceil($remaining / 3600);
+            $remaining = max(0, $expiresAtTs - now()->timestamp);
+            $hrs = (int) ceil($remaining / 3600);
 
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => "يمكنك رفع الإعلان مرة كل 24 ساعة. المُتبقي تقريبًا: {$hrs} ساعة.",
             ], 429);
         }
@@ -236,7 +236,7 @@ class UserController extends Controller
         $ok = $this->makeRankOne($categoryId, $ad->id);
         if (!$ok) {
             return response()->json([
-                'status'  => false,
+                'status' => false,
                 'message' => 'حدث خطأ أثناء تحديث الترتيب.',
             ], 500);
         }
@@ -245,7 +245,7 @@ class UserController extends Controller
         Cache::put($cacheKey, $expires->timestamp, $expires);
 
         return response()->json([
-            'status'  => true,
+            'status' => true,
             'message' => "تم رفع الإعلان #{$ad->id} إلى الترتيب الأول في قسم {$sec->name}.",
         ]);
     }
@@ -305,8 +305,8 @@ class UserController extends Controller
     {
         $user->loadCount('listings');
 
-        $singleSlug  = $request->query('category_slug') ?? $request->query('slug');
-        $multiSlugs  = $request->query('category_slugs') ?? $request->query('slugs'); // "a,b,c"
+        $singleSlug = $request->query('category_slug') ?? $request->query('slug');
+        $multiSlugs = $request->query('category_slugs') ?? $request->query('slugs'); // "a,b,c"
         $statusFilter = $request->query('status'); // Valid / Pending / Rejected / Expired
 
         $slugs = [];
@@ -314,13 +314,22 @@ class UserController extends Controller
             $slugs[] = trim($singleSlug);
         }
         if ($multiSlugs) {
-            $extra  = array_map('trim', explode(',', $multiSlugs));
-            $slugs  = array_values(array_filter(array_merge($slugs, $extra)));
+            $extra = array_map('trim', explode(',', $multiSlugs));
+            $slugs = array_values(array_filter(array_merge($slugs, $extra)));
         }
 
         $query = Listing::query()
             ->leftJoin('categories', 'listings.category_id', '=', 'categories.id')
-            ->with(['attributes', 'governorate', 'city', 'make', 'model'])
+            ->with([
+                'attributes',
+                'governorate',
+                'city',
+                'make',
+                'model',
+                // ✅ عشان نقدر نجيب أسماء القسم الرئيسي والفرعي
+                'mainSection',
+                'subSection',
+            ])
             ->where('listings.user_id', $user->id)
             ->when($statusFilter, fn($q) => $q->where('listings.status', $statusFilter))
             ->when(!empty($slugs), fn($q) => $q->whereIn('categories.slug', $slugs))
@@ -341,8 +350,10 @@ class UserController extends Controller
                 'listings.created_at',
                 'listings.governorate_id',
                 'listings.city_id',
+                // ✅ مهم لو حابة ترجعي الـ id كمان
+                'listings.main_section_id',
+                'listings.sub_section_id',
                 'categories.slug as category_slug',
-
             ])
             ->orderByDesc('listings.created_at');
 
@@ -357,60 +368,80 @@ class UserController extends Controller
             }
 
             // أسماء المحافظة/المدينة
-            $govName  = ($row->relationLoaded('governorate') && $row->governorate) ? $row->governorate->name : null;
+            $govName = ($row->relationLoaded('governorate') && $row->governorate) ? $row->governorate->name : null;
             $cityName = ($row->relationLoaded('city') && $row->city) ? $row->city->name : null;
 
             // بيانات القسم (slug + name)
             $catSlug = $row->category_slug;
             $catName = null;
+            $supportsMakeModel = false;
+            $supportsSections = false;
+            $mainSectionName = null;
+            $subSectionName = null;
+
             if ($row->category_id) {
                 $sec = Section::fromId($row->category_id);
-                $catSlug = $sec?->slug ?? $catSlug;
-                $catName = $sec?->name ?? null;
+
+                if ($sec) {
+                    $catSlug = $sec->slug ?? $catSlug;
+                    $catName = $sec->name ?? null;
+                    $supportsMakeModel = $sec->supportsMakeModel();
+                    $supportsSections = $sec->supportsSections(); // ✅ الدالة اللي اتفقنا عليها
+                }
             }
 
-            // make/model حسب القسم
-            $supportsMakeModel = false;
-            if ($row->category_id) {
-                $sec = Section::fromId($row->category_id);
-                $supportsMakeModel = $sec?->supportsMakeModel() ?? false;
+            // ✅ لو القسم ده بيدعم رئيسي/فرعي، نرجّعهم بالاسم
+            if ($supportsSections) {
+                $mainSectionName = ($row->relationLoaded('mainSection') && $row->mainSection)
+                    ? $row->mainSection->name
+                    : null;
+
+                $subSectionName = ($row->relationLoaded('subSection') && $row->subSection)
+                    ? $row->subSection->name
+                    : null;
             }
 
             $data = [
-                'attributes'      => $attrs,
-                'governorate'     => $govName,
-                'city'            => $cityName,
-                'price'           => $row->price,
-                'contact_phone'   => $row->contact_phone,
-                'whatsapp_phone'  => $row->whatsapp_phone,
-                'main_image_url'  => $row->main_image ? asset('storage/' . $row->main_image) : null,
-                'created_at'      => $row->created_at,
-                'plan_type'       => $row->plan_type,
+                'attributes' => $attrs,
+                'governorate' => $govName,
+                'city' => $cityName,
+                'price' => $row->price,
+                'contact_phone' => $row->contact_phone,
+                'whatsapp_phone' => $row->whatsapp_phone,
+                'main_image_url' => $row->main_image ? asset('storage/' . $row->main_image) : null,
+                'created_at' => $row->created_at,
+                'plan_type' => $row->plan_type,
                 'id' => $row->id,
                 'lat' => $row->lat,
                 'lng' => $row->lng,
                 'rank' => $row->rank,
                 'views' => $row->views,
 
-
-
-                // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
-                'category'        => $catSlug,
-                'category_name'   => $catName,
+                // الكاتيجري
+                'category' => $catSlug,
+                'category_name' => $catName,
             ];
 
+            // ✅ لو الكاتيجوري ده بيدعم make/model
             if ($supportsMakeModel) {
-                $data['make']  = ($row->relationLoaded('make')  && $row->make)  ? $row->make->name  : null;
+                $data['make'] = ($row->relationLoaded('make') && $row->make) ? $row->make->name : null;
                 $data['model'] = ($row->relationLoaded('model') && $row->model) ? $row->model->name : null;
+            }
+
+            // ✅ لو القسم بيدعم رئيسي/فرعي، نضيفهم
+            if ($supportsSections) {
+                $data['main_section_id'] = $row->main_section_id;
+                $data['main_section_name'] = $mainSectionName;
+                $data['sub_section_id'] = $row->sub_section_id;
+                $data['sub_section_name'] = $subSectionName;
             }
 
             return $data;
         })->values();
 
         return response()->json([
-            // 'user'     => $this->formatUserSummary($user),
             'listings' => $items,
-            'meta'     => ['total' => $items->count()],
+            'meta' => ['total' => $items->count()],
         ]);
     }
 
@@ -428,8 +459,10 @@ class UserController extends Controller
 
     protected function decodeJsonSafe($json)
     {
-        if (is_null($json)) return null;
-        if (is_array($json)) return $json;
+        if (is_null($json))
+            return null;
+        if (is_array($json))
+            return $json;
 
         $x = json_decode($json, true);
         return json_last_error() === JSON_ERROR_NONE ? $x : $json;
@@ -550,9 +583,9 @@ class UserController extends Controller
     public function createOtp(User $user)
     {
         // $otp = rand(100000, 999999);
-        $user->otp =1234 ;
+        $user->otp = 1234;
         $user->save();
-        return response()->json(['message' => 'Otp created successfully', 'otp' =>  $user->otp]);
+        return response()->json(['message' => 'Otp created successfully', 'otp' => $user->otp]);
     }
 
     //user verify otp
@@ -579,7 +612,7 @@ class UserController extends Controller
         $userId = $request->user()->id;
 
         $listing = Listing::where([
-            'id'      => $id,
+            'id' => $id,
             'user_id' => $userId,
         ])->first();
 
@@ -606,17 +639,17 @@ class UserController extends Controller
         });
 
         if (!$manualApprove) {
-            $listing->status        = 'Valid';
+            $listing->status = 'Valid';
             $listing->admin_approved = true;
-            $listing->published_at  = now();
-            $listing->expire_at     = now()->addDays(365);
+            $listing->published_at = now();
+            $listing->expire_at = now()->addDays(365);
         }
 
         $listing->save();
 
         return response()->json([
-            'success'    => true,
-            'message'    => 'Payment done successfully',
+            'success' => true,
+            'message' => 'Payment done successfully',
             'listing_id' => $listing->id,
         ]);
     }
