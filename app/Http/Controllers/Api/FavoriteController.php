@@ -38,6 +38,7 @@ class FavoriteController extends Controller
                 'id'         => $ad->id,
                 'rank'       => $ad->rank,
                 'categry'    => $slug,
+                'categry_name'=> $slug ? Section::fromId($ad->category_id)->name : null,
             ];
         })->filter();
 
