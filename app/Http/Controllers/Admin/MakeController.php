@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Listing;
 use App\Models\Make;
 use App\Models\CarModel;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -94,8 +96,25 @@ class MakeController extends Controller
 
     public function destroy(Make $make)
     {
+        // كل الموديلات اللي تحت الماركة دي
+        $modelIds = $make->models()->pluck('id');
+
+        $isUsed = Listing::where('make_id', $make->id)
+            ->orWhereIn('model_id', $modelIds)
+            ->exists();
+
+        if ($isUsed) {
+            return response()->json([
+                'message' => 'لا يمكن حذف هذه الماركة لأنها مرتبطة بإعلانات أو موديلات مستخدمة في إعلانات.',
+            ], 422);
+        }
+
+        // لو حابة كمان يتم حذف كل الموديلات التابعة ليها:
+        $make->models()->delete();
+
         $make->delete();
-        return response()->json(null, 204);
+
+        return response()->json("Deleted successfully", 204);
     }
 
     public function models(Make $make)
@@ -139,8 +158,8 @@ class MakeController extends Controller
     public function updateModel(Request $request, CarModel $model)
     {
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:191', 'unique:models,name,' . $model->id . ',id,make_id,' . $model->make_id],
-            'make_id' => ['sometimes', 'integer', 'exists:makes,id'],
+            'name' => ['required', 'string', 'max:191', 'unique:models,name,' . $model->id . ',id,make_id,' . $model->make_id],
+            'make_id' => ['required', 'integer', 'exists:makes,id'],
         ]);
 
         $model->update($data);
@@ -149,7 +168,16 @@ class MakeController extends Controller
 
     public function deleteModel(CarModel $model)
     {
+        $isUsed = Listing::where('model_id', $model->id)->exists();
+
+        if ($isUsed) {
+            return response()->json([
+                'message' => 'لا يمكن حذف هذا الموديل لأنه مستخدم في إعلانات حالية.',
+            ], 422);
+        }
+
         $model->delete();
-        return response()->json(null, 204);
+
+        return response()->json("Deleted successfully", 204);
     }
 }

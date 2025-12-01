@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\categoryController;
 use App\Http\Controllers\Admin\CategoryFieldsController;
+use App\Http\Controllers\Admin\CategorySectionsController;
 use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CarController;
@@ -31,6 +32,12 @@ Route::get('governorates/{governorate}/cities', [GovernorateController::class, '
 
 //public makes routes
 Route::get('makes', [MakeController::class, 'index']);
+
+Route::get('makes/{make}/models', [MakeController::class, 'models']);
+
+//public main category
+Route::get('/main-sections',[CategorySectionsController::class,'index']);
+Route::get('/sub-sections/{mainSection}',[CategorySectionsController::class,'subSections']);
 
 Route::get('/system-settings', [SystemSettingController::class, 'index']);
 
@@ -84,7 +91,7 @@ Route::prefix('admin')
 
         // System Settings Routes
         // Route::apiResource('system-settings', SystemSettingController::class);
-
+    
         // Admin Stats Route
         Route::get('stats', [StatsController::class, 'index']);
         Route::get('recent-activities', [StatsController::class, 'recentActivities']);
@@ -97,7 +104,7 @@ Route::prefix('admin')
         Route::delete('users/{user}', [UserController::class, 'deleteUser']);
         Route::patch('users/{user}/block', [UserController::class, 'blockedUser']);
         // Route::get('users/{user}/listings', [UserController::class, 'userListings']);
-
+    
         //Best Advertiser
         Route::post('/featured', [BestAdvertiserController::class, 'store']);
         Route::put('/disable/{bestAdvertiser}', [BestAdvertiserController::class, 'disable']);
@@ -124,10 +131,18 @@ Route::prefix('admin')
         Route::post('makes', [MakeController::class, 'addMake']);
         Route::put('makes/{make}', [MakeController::class, 'update']);
         Route::delete('makes/{make}', [MakeController::class, 'destroy']);
-        Route::get('makes/{make}/models', [MakeController::class, 'models']);
+
         Route::post('makes/{make}/models', [MakeController::class, 'addModel']);
         Route::put('models/{model}', [MakeController::class, 'updateModel']);
         Route::delete('models/{model}', [MakeController::class, 'deleteModel']);
+
+
+        Route::post('/main-section/{categorySlug}',[CategorySectionsController::class,'storeMain']);
+        Route::post('/sub-section/{mainSection}',[CategorySectionsController::class,'addSubSections']);
+        Route::put('/main-section/{mainSection}',[CategorySectionsController::class,'updateMain']);
+        Route::put('/sub-section/{subSection}',[CategorySectionsController::class,'updateSub']);
+        Route::delete('/main-section/{mainSection}',[CategorySectionsController::class,'destroyMain']);
+        Route::delete('/sub-section/{subSection}',[CategorySectionsController::class,'destroySub']);
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);
