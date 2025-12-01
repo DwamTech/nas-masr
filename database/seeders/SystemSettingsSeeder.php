@@ -246,5 +246,24 @@ class SystemSettingsSeeder extends Seeder
                 'updated_at'  => $now,
             ]
         );
+
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'enable_global_external_notif'],
+            [
+                'value'       => '1',
+                'type'        => 'boolean',
+                'group'       => 'general',
+                'label'       => 'تفعيل الإشعارات الخارجية (Push/SMS) على مستوى النظام',
+                'meta'        => json_encode([
+                    'input'       => 'switch',
+                    'true_label'  => 'مفعّل',
+                    'false_label' => 'معطّل',
+                    'icon'        => 'bell'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
     }
 }

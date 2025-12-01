@@ -21,11 +21,12 @@ class SystemSettingController extends Controller
         'email',
         'featured_users_count',
         'show_phone',
-        'manual_approval'
+        'manual_approval',
+        'enable_global_external_notif'
     ];
 
     // مفاتيح حسب النوع
-    protected array $booleanKeys = ['show_phone','manual_approval'];
+    protected array $booleanKeys = ['show_phone','manual_approval','enable_global_external_notif'];
     protected array $integerKeys = ['featured_users_count'];
 
     protected function rules(): array
@@ -43,7 +44,8 @@ class SystemSettingController extends Controller
             'email'                 => ['nullable', 'email', 'max:255'],
             'show_phone'            => ['nullable', 'boolean'],
             'featured_users_count'  => ['nullable', 'integer', 'min:0', 'max:100'],
-            'manual_approval'=>['nullable','boolean']
+            'manual_approval'=>['nullable','boolean'],
+            'enable_global_external_notif' => ['nullable', 'boolean'],
         ];
     }
 

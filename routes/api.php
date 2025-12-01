@@ -18,6 +18,7 @@ use App\Http\Controllers\BestAdvertiserController;
 use App\Models\Listing as ListingModel;
 use App\Http\Controllers\Admin\GovernorateController;
 use App\Http\Controllers\Admin\MakeController;
+use App\Http\Controllers\Api\NotificationController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('v1/test', fn() => response()->json(['ok' => true]));
@@ -168,4 +169,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/favorites', [FavoriteController::class, 'index']);
     Route::post('/favorite', [FavoriteController::class, 'toggle']);
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/status', [NotificationController::class, 'status']);
+    Route::post('/notifications', [NotificationController::class, 'store'])->middleware('admin');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
+    Route::post('/notifications/read', [NotificationController::class, 'read']);
 });
+    Route::post('/settings/notifications', [UserController::class, 'updateNotificationSettings']);

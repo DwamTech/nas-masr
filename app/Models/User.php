@@ -31,6 +31,7 @@ class User extends Authenticatable
         'lat',
         'lng',
         'status',
+        'receive_external_notif',
         'address',
         'country_code',
         'otp',
@@ -59,6 +60,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'otp_verified' => 'boolean',
+            'receive_external_notif' => 'boolean',
         ];
     }
 

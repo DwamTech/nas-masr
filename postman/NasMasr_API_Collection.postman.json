@@ -1,0 +1,222 @@
+{
+  "info": {
+    "name": "NasMasr Mobile API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost" },
+    { "key": "token_user", "value": "" },
+    { "key": "token_admin", "value": "" },
+    { "key": "section_slug", "value": "cars" },
+    { "key": "ad_id", "value": "1" },
+    { "key": "user_id", "value": "5" }
+  ],
+  "item": [
+    {
+      "name": "Auth / Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/register",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "register" ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"01012345678\",\n  \"password\": \"123456\",\n  \"name\": \"Test User\",\n  \"country_code\": \"+20\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Listings / Get by section",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/{{section_slug}}/listings",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "v1", "{{section_slug}}", "listings" ]
+        }
+      }
+    },
+    {
+      "name": "Favorites / List",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/favorites",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "favorites" ]
+        }
+      }
+    },
+    {
+      "name": "Favorites / Toggle",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/favorite",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "favorite" ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ad_id\": {{ad_id}}\n}"
+        }
+      }
+    },
+    {
+      "name": "Notifications / List (All)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications?per_page=20",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "notifications" ],
+          "query": [ { "key": "per_page", "value": "20" } ]
+        }
+      }
+    },
+    {
+      "name": "Notifications / List (Unread)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications?status=unread&per_page=20",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "notifications" ],
+          "query": [
+            { "key": "status", "value": "unread" },
+            { "key": "per_page", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Notifications / Badge Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications/status",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "notifications", "status" ]
+        }
+      }
+    },
+    {
+      "name": "Notifications / Mark Read (single)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications/read",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "notifications", "read" ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 123\n}"
+        }
+      }
+    },
+    {
+      "name": "Notifications / Mark Read (all)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications/read",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "notifications", "read" ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"all\": true\n}"
+        }
+      }
+    },
+    {
+      "name": "Notifications / Create (admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/notifications",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "notifications" ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": {{user_id}},\n  \"title\": \"تم اكتمال الطلب\",\n  \"body\": \"طلبك جاهز للاستلام\",\n  \"type\": \"order\",\n  \"data\": { \"order_id\": 55 }\n}"
+        }
+      }
+    },
+    {
+      "name": "User Settings / External Notifications",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token_user}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/settings/notifications",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "settings", "notifications" ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"receive_external\": true\n}"
+        }
+      }
+    },
+    {
+      "name": "Admin / Global External Notifications",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token_admin}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/admin/system-settings",
+          "host": [ "{{base_url}}" ],
+          "path": [ "api", "admin", "system-settings" ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enable_global_external_notif\": false\n}"
+        }
+      }
+    }
+  ]
+}
+

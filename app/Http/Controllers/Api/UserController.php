@@ -250,6 +250,19 @@ class UserController extends Controller
         ]);
     }
 
+    public function updateNotificationSettings(Request $request)
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'receive_external' => ['required', 'boolean'],
+        ]);
+        $user->receive_external_notif = (bool) $data['receive_external'];
+        $user->save();
+        return response()->json([
+            'receive_external' => (bool) $user->receive_external_notif,
+        ]);
+    }
+
     public function logout(Request $request)
     {
         $user = $request->user();
