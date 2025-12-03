@@ -19,6 +19,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Carbon;
+use App\Models\CategoryPlanPrice;
+use App\Models\ListingPayment;
 use App\Services\NotificationService;
 
 
@@ -684,6 +686,18 @@ class UserController extends Controller
             ]);
         }
 
+        $prices = CategoryPlanPrice::where('category_id', $listing->category_id)->first();
+        $plan = strtolower($listing->plan_type ?? 'standard');
+        $amount = 0.0;
+        $days = 0;
+        if ($plan === 'featured') {
+            $amount = (float) ($prices->featured_ad_price ?? 0);
+            $days = (int) ($prices->featured_days ?? 0);
+        } elseif ($plan === 'standard') {
+            $amount = (float) ($prices->standard_ad_price ?? 0);
+            $days = (int) ($prices->standard_days ?? 0);
+        }
+
         $listing->isPayment = true;
 
         $manualApprove = Cache::remember('settings:manual_approval', now()->addHours(6), function () {
@@ -695,15 +709,31 @@ class UserController extends Controller
             $listing->status = 'Valid';
             $listing->admin_approved = true;
             $listing->published_at = now();
-            $listing->expire_at = now()->addDays(365);
+            $listing->expire_at = $days > 0 ? now()->copy()->addDays($days) : now()->addDays(365);
         }
 
         $listing->save();
+
+        ListingPayment::updateOrCreate(
+            ['listing_id' => $listing->id],
+            [
+                'user_id' => $userId,
+                'category_id' => $listing->category_id,
+                'plan_type' => $plan,
+                'amount' => $amount,
+                'currency' => $listing->currency,
+                'paid_at' => now(),
+                'payment_reference' => $request->input('payment_reference'),
+                'status' => 'paid',
+            ]
+        );
 
         return response()->json([
             'success' => true,
             'message' => 'Payment done successfully',
             'listing_id' => $listing->id,
+            'amount' => $amount,
+            'price' => $amount,
         ]);
     }
 }

@@ -20,6 +20,7 @@ use App\Models\Listing as ListingModel;
 use App\Http\Controllers\Admin\GovernorateController;
 use App\Http\Controllers\Admin\MakeController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\PlansController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -43,6 +44,8 @@ Route::get('/main-sections', [CategorySectionsController::class, 'index']);
 Route::get('/sub-sections/{mainSection}', [CategorySectionsController::class, 'subSections']);
 
 Route::get('/system-settings', [SystemSettingController::class, 'index']);
+
+Route::get('/plan-prices', [SubscriptionController::class, 'pricesByCategory']);
 
 //public listing for specific user
 Route::get('users/{user}', [UserController::class, 'showUserWithListings']);
@@ -185,5 +188,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
     Route::post('/notifications/read', [NotificationController::class, 'read']);
+    Route::post('/plan-subscriptions', [SubscriptionController::class, 'subscribe']);
+    Route::get('/my-subscription', [SubscriptionController::class, 'mySubscription']);
 });
 Route::post('/settings/notifications', [UserController::class, 'updateNotificationSettings']);

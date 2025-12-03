@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use App\Models\UserPlanSubscription;
+use App\Models\CategoryPlanPrice;
 use App\Services\NotificationService;
 
 
@@ -232,15 +234,42 @@ class ListingController extends Controller
 
         $paymentRequired = false;
         $packageData = null;
+        $activeSub = null;
+        $paymentType = null;
+        $paymentReference = null;
+        $priceOut = 0.0;
 
-        if ($data['plan_type'] !== 'free') {
-            $packageResult = $this->consumeForPlan($user->id, $data['plan_type']);
-            $packageData   = $packageResult->getData(true);
+        if (!empty($data['plan_type']) && $data['plan_type'] !== 'free') {
+            $planNorm = $this->normalizePlan($data['plan_type']);
+            $activeSub = UserPlanSubscription::query()
+                ->where('user_id', $user->id)
+                ->where('category_id', $sec->id())
+                ->where('plan_type', $planNorm)
+                ->where('payment_status', 'paid')
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+                })
+                ->first();
 
-            if (empty($packageData['success']) || $packageData['success'] === false) {
-                $paymentRequired = true;
+            if ($activeSub) {
+                $data['expire_at'] = $activeSub->expires_at;
+                $paymentType = 'subscription';
+                $paymentReference = $activeSub->payment_reference;
+                $priceOut = (float) ($activeSub->price ?? 0);
             } else {
-                $data['expire_at'] = Carbon::parse($packageData['expire_date']);
+                $packageResult = $this->consumeForPlan($user->id, $planNorm);
+                $packageData   = $packageResult->getData(true);
+
+                if (empty($packageData['success']) || $packageData['success'] === false) {
+                    $paymentRequired = true;
+                } else {
+                    $data['expire_at'] = Carbon::parse($packageData['expire_date']);
+                    $paymentType = 'package';
+                    $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
+                    $priceOut = $planNorm === 'featured'
+                        ? (float) ($prices?->featured_ad_price ?? 0)
+                        : (float) ($prices?->standard_ad_price ?? 0);
+                }
             }
         }
 
@@ -255,8 +284,12 @@ class ListingController extends Controller
                 $data['status'] = 'Valid';
                 $data['admin_approved'] = true;
                 $data['published_at'] = now();
-                if ($data['plan_type'] == 'free') {
-                $data['expire_at'] = now()->addDays(365);
+                if (($data['plan_type'] ?? 'free') === 'free' && empty($data['expire_at'])) {
+                    $data['expire_at'] = now()->addDays(365);
+                }
+                if (($data['plan_type'] ?? 'free') === 'free') {
+                    $paymentType = 'free';
+                    $priceOut = 0.0;
                 }
             }
         }
@@ -275,7 +308,7 @@ class ListingController extends Controller
             ], 402);
         }
 
-        return new ListingResource(
+        return (new ListingResource(
             $listing->load([
                 'attributes',
                 'governorate',
@@ -285,7 +318,17 @@ class ListingController extends Controller
                 'mainSection',
                 'subSection',
             ])
-        );
+        ))->additional([
+            'payment' => [
+                'type' => $paymentType,
+                'plan_type' => $data['plan_type'] ?? 'free',
+                'price' => $priceOut,
+                'payment_reference' => $paymentReference,
+                'currency' => $listing->currency,
+                'user_id' => $user->id,
+                'subscribed_at' => $activeSub?->subscribed_at,
+            ],
+        ]);
     }
 
     public function show(string $section, Listing $listing, NotificationService $notifications)
