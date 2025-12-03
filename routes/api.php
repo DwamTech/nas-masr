@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\categoryController;
 use App\Http\Controllers\Admin\CategoryFieldsController;
+use App\Http\Controllers\Admin\CategoryPlanPricesController;
 use App\Http\Controllers\Admin\CategorySectionsController;
 use App\Http\Controllers\Admin\PackagesController;
 use App\Http\Controllers\Api\AuthController;
@@ -19,6 +20,7 @@ use App\Models\Listing as ListingModel;
 use App\Http\Controllers\Admin\GovernorateController;
 use App\Http\Controllers\Admin\MakeController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\PlansController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('v1/test', fn() => response()->json(['ok' => true]));
@@ -71,6 +73,8 @@ Route::prefix('v1/{section}')->group(function () {
     // Route::apiResource('listings', ListingController::class)->only(['index', 'show']);
 
     // Route::apiResource('listings', ListingController::class)->only(['index', 'show']);
+    Route::get('plans', [PlansController::class, 'show']);
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('listings', ListingController::class)->only(['store', 'update', 'destroy', 'index', 'show']);
     });
@@ -147,6 +151,10 @@ Route::prefix('admin')
         Route::put('/sub-section/{subSection}', [CategorySectionsController::class, 'updateSub']);
         Route::delete('/main-section/{mainSection}', [CategorySectionsController::class, 'destroyMain']);
         Route::delete('/sub-section/{subSection}', [CategorySectionsController::class, 'destroySub']);
+
+
+        Route::get('category-plan-prices', [CategoryPlanPricesController::class, 'index']);
+        Route::post('category-plan-prices', [CategoryPlanPricesController::class, 'store']);
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);

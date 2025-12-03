@@ -27,4 +27,8 @@ class Category extends Model
 
         return asset('storage/uploads/categories/' . $this->icon);
     }
+    public function planPrice()
+    {
+        return $this->hasOne(\App\Models\CategoryPlanPrice::class);
+    }
 }

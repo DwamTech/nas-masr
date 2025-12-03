@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Category;
 use App\Models\CategoryField;
+use App\Models\CategoryPlanPrice;
 
 final class Section
 {
@@ -12,8 +13,7 @@ final class Section
         public int $categoryId,
         public array $fields,
         public ?string $name = null,
-    ) {
-    }
+    ) {}
 
     public static function fromSlug(string $slug): self
     {
@@ -106,6 +106,21 @@ final class Section
             'spare-parts'
         ], true);
     }
+
+    public function planPrices(): ?array
+    {
+        $row = CategoryPlanPrice::where('category_id', $this->categoryId)->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'price_featured' => (int) $row->price_featured,
+            'price_standard' => (int) $row->price_standard,
+        ];
+    }
+
 
     public function supportsContact(): bool
     {
