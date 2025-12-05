@@ -8,27 +8,35 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('user_plan_subscriptions', function (Blueprint $table) {
-            $table->string('payment_method', 50)
-                ->nullable()
-                ->after('payment_status'); 
-        });
+        if (!Schema::hasColumn('user_plan_subscriptions', 'payment_method')) {
+            Schema::table('user_plan_subscriptions', function (Blueprint $table) {
+                $table->string('payment_method', 50)
+                    ->nullable()
+                    ->after('payment_status');
+            });
+        }
 
-        Schema::table('listing_payments', function (Blueprint $table) {
-            $table->string('payment_method', 50)
-                ->nullable()
-                ->after('amount'); 
-        });
+        if (!Schema::hasColumn('listing_payments', 'payment_method')) {
+            Schema::table('listing_payments', function (Blueprint $table) {
+                $table->string('payment_method', 50)
+                    ->nullable()
+                    ->after('amount');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('user_plan_subscriptions', function (Blueprint $table) {
-            $table->dropColumn('payment_method');
-        });
+        if (Schema::hasColumn('user_plan_subscriptions', 'payment_method')) {
+            Schema::table('user_plan_subscriptions', function (Blueprint $table) {
+                $table->dropColumn('payment_method');
+            });
+        }
 
-        Schema::table('listing_payments', function (Blueprint $table) {
-            $table->dropColumn('payment_method');
-        });
+        if (Schema::hasColumn('listing_payments', 'payment_method')) {
+            Schema::table('listing_payments', function (Blueprint $table) {
+                $table->dropColumn('payment_method');
+            });
+        }
     }
 };
