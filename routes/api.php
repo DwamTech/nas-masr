@@ -184,6 +184,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/edit-profile', [UserController::class, 'editProfile']);
     Route::get('/my-ads', [UserController::class, 'myAds']);
     Route::get('/my-packages', [UserController::class, 'myPackages']);
+    Route::get('/my-plans', [UserController::class, 'myPlans']);
     Route::post('/create-agent-code', [UserController::class, 'storeAgent']);
     Route::get('/all-clients', [UserController::class, 'allClients']);
     Route::post('/set-rank-one', [UserController::class, 'SetRankOne']);

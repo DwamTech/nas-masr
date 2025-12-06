@@ -9,6 +9,7 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\UserClient;
 use App\Models\UserPackages;
+use App\Models\UserPlanSubscription;
 use App\Support\Section;
 use App\Traits\HasRank;
 use Illuminate\Support\Facades\Auth;
@@ -216,6 +217,70 @@ class UserController extends Controller
 
         // في الآخر نرجّع بس الباقات اللي المستخدم فعلاً دخل فيها قبل كده
         return response()->json([
+            'packages' => $packages,
+        ]);
+    }
+
+    public function myPlans(Request $request)
+    {
+        $user = $request->user();
+        $slug = $request->query('category_slug');
+
+        $subsQ = UserPlanSubscription::query()->where('user_id', $user->id);
+        if ($slug) {
+            $sec = Section::fromSlug($slug);
+            $subsQ->where('category_id', $sec->id());
+        }
+        $subs = $subsQ->orderByDesc('id')->get();
+
+        $subscriptions = $subs->map(function ($s) {
+            $sec = Section::fromId((int) $s->category_id);
+            $active = !$s->expires_at || $s->expires_at->isFuture();
+            return [
+                'id' => $s->id,
+                'category_id' => (int) $s->category_id,
+                'category_slug' => $sec?->slug,
+                'category_name' => $sec?->name,
+                'plan_type' => $s->plan_type,
+                'days' => (int) ($s->days ?? 0),
+                'subscribed_at' => $s->subscribed_at,
+                'expires_at' => $s->expires_at,
+                'price' => (float) ($s->price ?? 0),
+                'ad_price' => (float) ($s->ad_price ?? 0),
+                'payment_status' => $s->payment_status,
+                'payment_method' => $s->payment_method,
+                'payment_reference' => $s->payment_reference,
+                'active' => $active,
+            ];
+        })->values();
+
+        $pkg = UserPackages::where('user_id', $user->id)->first();
+        $packages = [];
+        if ($pkg) {
+            $packages[] = [
+                'title' => 'الباقة المتميزة',
+                'plan' => 'featured',
+                'active' => (bool) $pkg->featured_active,
+                'expires_at' => $pkg->featured_expire_date,
+                'days' => (int) ($pkg->featured_days ?? 0),
+                'total' => (int) ($pkg->featured_ads ?? 0),
+                'used' => (int) ($pkg->featured_ads_used ?? 0),
+                'remaining' => (int) $pkg->featured_ads_remaining,
+            ];
+            $packages[] = [
+                'title' => 'الباقة القياسية',
+                'plan' => 'standard',
+                'active' => (bool) $pkg->standard_active,
+                'expires_at' => $pkg->standard_expire_date,
+                'days' => (int) ($pkg->standard_days ?? 0),
+                'total' => (int) ($pkg->standard_ads ?? 0),
+                'used' => (int) ($pkg->standard_ads_used ?? 0),
+                'remaining' => (int) $pkg->standard_ads_remaining,
+            ];
+        }
+
+        return response()->json([
+            'subscriptions' => $subscriptions,
             'packages' => $packages,
         ]);
     }

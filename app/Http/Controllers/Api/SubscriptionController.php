@@ -7,6 +7,7 @@ use App\Models\CategoryPlanPrice;
 use App\Models\UserPlanSubscription;
 use App\Models\Listing;
 use App\Models\SystemSetting;
+use App\Models\UserPackages;
 use App\Support\Section;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -54,8 +55,39 @@ class SubscriptionController extends Controller
             // كل الطرق دي أونلاين → لازم رقم أو كود مرجعي للعملية
             // 'payment_reference' => ['required', 'string', 'max:191'],
         ]);
-
         $sec = Section::fromSlug($data['category_slug']);
+        $plan = strtolower($data['plan_type']);
+
+        $existingSub = UserPlanSubscription::query()
+            ->where('user_id', $user->id)
+            ->where('category_id', $sec->id())
+            ->where('plan_type', $plan)
+            ->where('payment_status', 'paid')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+            })
+            ->first();
+        if ($existingSub) {
+            return response()->json([
+                'message' => 'لديك اشتراك مدفوع فعّال لهذه الخطة بالفعل.',
+                'subscription' => $existingSub,
+            ], 409);
+        }
+
+        $pkg = UserPackages::where('user_id', $user->id)->first();
+        if ($pkg) {
+            $activeByPlan = $plan === 'featured' ? (bool)$pkg->featured_active : (bool)$pkg->standard_active;
+            $remain = $plan === 'featured' ? (int)$pkg->featured_ads_remaining : (int)$pkg->standard_ads_remaining;
+            if ($activeByPlan && $remain > 0) {
+                return response()->json([
+                    'message' => 'لديك باقة فعّالة ورصيد متاح لهذه الخطة، استخدم الباقة بدل الاشتراك.',
+                    'package_id' => $pkg->id,
+                    'plan' => $plan,
+                    'remaining' => $remain,
+                    'expire_date' => $plan === 'featured' ? $pkg->featured_expire_date : $pkg->standard_expire_date,
+                ], 422);
+            }
+        }
 
         $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
         if (!$prices) {
@@ -63,8 +95,6 @@ class SubscriptionController extends Controller
                 'message' => 'لم يتم ضبط أسعار هذه الباقة لهذا القسم بعد. برجاء مراجعة الإدارة.',
             ], 422);
         }
-
-        $plan = strtolower($data['plan_type']);
 
         $days = $plan === 'featured'
             ? (int) ($prices->featured_days ?? 0)
@@ -106,7 +136,8 @@ class SubscriptionController extends Controller
         $ad = Listing::query()
             ->where('user_id', $user->id)
             ->where('category_id', $sec->id())
-            ->where('plan_type', $plan);
+            ->where('plan_type', $plan)
+            ->where('isPayment',false);
 
         $ad->update(['publish_via' => env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription')]);
         if (!$manualApprove) {
@@ -128,6 +159,7 @@ class SubscriptionController extends Controller
     public function mySubscription(Request $request)
     {
         $user = $request->user();
+
         $slug = $request->query('category_slug');
         $sec = Section::fromSlug($slug);
         $sub = UserPlanSubscription::where('user_id', $user->id)

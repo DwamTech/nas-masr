@@ -298,11 +298,11 @@ class ListingController extends Controller
 
             if ($overCount || $overPrice) {
                 $paymentRequired = true;
-                $data['plan_type'] = $data['plan_type'] ?? 'standard';
-                $data['publish_via'] = env('LISTING_PUBLISH_VIA_AD_PAYMENT', 'ad_payment');
-                $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
-                $priceOut = (float) ($prices?->standard_ad_price ?? 0);
-                $paymentType = 'ad_payment';
+                // $data['plan_type'] = $data['plan_type'] ?? 'standard';
+                // $data['publish_via'] = env('LISTING_PUBLISH_VIA_AD_PAYMENT', 'ad_payment');
+                // $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
+                // $priceOut = (float) ($prices?->standard_ad_price ?? 0);
+                // $paymentType = 'ad_payment';
             } else {
                 $data['publish_via'] = $freeVia;
                 $paymentType = 'free';
@@ -344,6 +344,7 @@ class ListingController extends Controller
                 'message' =>  ' لا تملك باقة فعّالة، يجب عليك دفع قيمة هذا الإعلان.او الاشتراك في باقه',
                 'payment_required' => true,
                 'listing_id' => $listing->id,
+                'count'=>$userFreeCount,
             ], 402);
         }
 
