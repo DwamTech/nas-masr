@@ -265,5 +265,45 @@ class SystemSettingsSeeder extends Seeder
                 'updated_at'  => $now,
             ]
         );
+
+        // عدد إعلانات المجاني
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'free_ads_count'],
+            [
+                'value'       => '0',
+                'type'        => 'integer',
+                'group'       => 'ads',
+                'label'       => 'عدد الإعلانات المجانية لكل مستخدم',
+                'meta'        => json_encode([
+                    'input' => 'number',
+                    'min'   => 0,
+                    'step'  => 1,
+                    'hint'  => 'يحدد أقصى عدد إعلانات مجانية يمكن للمستخدم نشرها'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        // أقصى قيمة لسعر الإعلان المجاني
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'free_ads_max_price'],
+            [
+                'value'       => '0',
+                'type'        => 'integer',
+                'group'       => 'ads',
+                'label'       => 'أقصى قيمة لسعر الإعلان المجاني',
+                'meta'        => json_encode([
+                    'input' => 'number',
+                    'min'   => 0,
+                    'step'  => 1,
+                    'hint'  => 'لن يُعتبر الإعلان مجانياً إذا تجاوز السعر هذه القيمة'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
     }
 }

@@ -275,6 +275,40 @@ class ListingController extends Controller
                     $data['publish_via'] = env('LISTING_PUBLISH_VIA_PACKAGE', 'package');
                 }
             }
+        }else{
+            $freeCount = Cache::remember('settings:free_ads_count', now()->addHours(6), function () {
+                return (int) (SystemSetting::where('key', 'free_ads_count')->value('value') ?? 0);
+            });
+            $freeMaxPrice = Cache::remember('settings:free_ads_max_price', now()->addHours(6), function () {
+                return (int) (SystemSetting::where('key', 'free_ads_max_price')->value('value') ?? 0);
+            });
+
+            $freeVia = env('LISTING_PUBLISH_VIA_FREE', 'free');
+            $userFreeCount = Listing::query()
+                ->where('user_id', $user->id)
+                ->where(function ($q) use ($freeVia) {
+                    $q->where('publish_via', $freeVia)->orWhere('plan_type', 'free');
+                })
+                ->whereIn('status', ['Valid', 'Pending'])
+                ->count();
+
+            $priceVal = (float) ($data['price'] ?? 0);
+            $overCount = ($freeCount > 0 && $userFreeCount >= $freeCount);
+            $overPrice = ($freeMaxPrice > 0 && $priceVal > $freeMaxPrice);
+
+            if ($overCount || $overPrice) {
+                $paymentRequired = true;
+                $data['plan_type'] = $data['plan_type'] ?? 'standard';
+                $data['publish_via'] = env('LISTING_PUBLISH_VIA_AD_PAYMENT', 'ad_payment');
+                $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
+                $priceOut = (float) ($prices?->standard_ad_price ?? 0);
+                $paymentType = 'ad_payment';
+            } else {
+                $data['publish_via'] = $freeVia;
+                $paymentType = 'free';
+                $priceOut = 0.0;
+                
+            }
         }
 
         if ($paymentRequired) {

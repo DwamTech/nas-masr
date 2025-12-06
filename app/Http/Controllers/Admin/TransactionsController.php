@@ -12,7 +12,7 @@ class TransactionsController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $perPage = (int) $request->query('per_page', 20);
+        $perPage = (int) $request->query('per_page', 100);
         $userId = $request->query('user_id');
         $categoryId = $request->query('category_id');
         $planType = $request->query('plan_type');

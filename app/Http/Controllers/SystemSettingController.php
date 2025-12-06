@@ -22,12 +22,14 @@ class SystemSettingController extends Controller
         'featured_users_count',
         'show_phone',
         'manual_approval',
-        'enable_global_external_notif'
+        'enable_global_external_notif',
+        'free_ads_count',
+        'free_ads_max_price'
     ];
 
     // مفاتيح حسب النوع
     protected array $booleanKeys = ['show_phone','manual_approval','enable_global_external_notif'];
-    protected array $integerKeys = ['featured_users_count'];
+    protected array $integerKeys = ['featured_users_count','free_ads_count','free_ads_max_price'];
 
     protected function rules(): array
     {
@@ -46,6 +48,8 @@ class SystemSettingController extends Controller
             'featured_users_count'  => ['nullable', 'integer', 'min:0', 'max:100'],
             'manual_approval'=>['nullable','boolean'],
             'enable_global_external_notif' => ['nullable', 'boolean'],
+            'free_ads_count'        => ['nullable', 'integer', 'min:0'],
+            'free_ads_max_price'    => ['nullable', 'integer', 'min:0'],
         ];
     }
 
@@ -58,7 +62,9 @@ class SystemSettingController extends Controller
 
     protected function groupForKey(string $key): string
     {
-        return $key === 'panner_image' ? 'appearance' : 'general';
+        if ($key === 'panner_image') return 'appearance';
+        if (in_array($key, ['free_ads_count','free_ads_max_price'], true)) return 'ads';
+        return 'general';
     }
 
     // قبل التخزين: موحّد كل حاجة كـ string (مع تحويل منطقي للأرقام والبوليان)
