@@ -22,81 +22,81 @@ use Symfony\Component\HttpFoundation\Response;
 
 class StatsController extends Controller
 {
-  public function index(): JsonResponse
-{
-    $now = Carbon::now();
+    public function index(): JsonResponse
+    {
+        $now = Carbon::now();
 
-    $currentStart = $now->copy()->startOfMonth();
-    $currentEnd   = $now->copy()->endOfMonth();
+        $currentStart = $now->copy()->startOfMonth();
+        $currentEnd   = $now->copy()->endOfMonth();
 
-    $prevStart = $now->copy()->subMonthNoOverflow()->startOfMonth();
-    $prevEnd   = $now->copy()->subMonthNoOverflow()->endOfMonth();
+        $prevStart = $now->copy()->subMonthNoOverflow()->startOfMonth();
+        $prevEnd   = $now->copy()->subMonthNoOverflow()->endOfMonth();
 
-    $totalAll         = Listing::query()->count();
-    $totalAllCurrent  = Listing::query()->whereBetween('created_at', [$currentStart, $currentEnd])->count();
-    $totalAllPrev     = Listing::query()->whereBetween('created_at', [$prevStart, $prevEnd])->count();
+        $totalAll         = Listing::query()->count();
+        $totalAllCurrent  = Listing::query()->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+        $totalAllPrev     = Listing::query()->whereBetween('created_at', [$prevStart, $prevEnd])->count();
 
-    $totalPending        = Listing::query()->where('status', 'Pending')->count();
-    $totalPendingCurrent = Listing::query()
-        ->where('status', 'Pending')
-        ->whereBetween('created_at', [$currentStart, $currentEnd])
-        ->count();
-    $totalPendingPrev    = Listing::query()
-        ->where('status', 'Pending')
-        ->whereBetween('created_at', [$prevStart, $prevEnd])
-        ->count();
+        $totalPending        = Listing::query()->where('status', 'Pending')->count();
+        $totalPendingCurrent = Listing::query()
+            ->where('status', 'Pending')
+            ->whereBetween('created_at', [$currentStart, $currentEnd])
+            ->count();
+        $totalPendingPrev    = Listing::query()
+            ->where('status', 'Pending')
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
+            ->count();
 
-    $totalRejected        = Listing::query()->where('status', 'Rejected')->count();
-    $totalRejectedCurrent = Listing::query()
-        ->where('status', 'Rejected')
-        ->whereBetween('created_at', [$currentStart, $currentEnd])
-        ->count();
-    $totalRejectedPrev    = Listing::query()
-        ->where('status', 'Rejected')
-        ->whereBetween('created_at', [$prevStart, $prevEnd])
-        ->count();
+        $totalRejected        = Listing::query()->where('status', 'Rejected')->count();
+        $totalRejectedCurrent = Listing::query()
+            ->where('status', 'Rejected')
+            ->whereBetween('created_at', [$currentStart, $currentEnd])
+            ->count();
+        $totalRejectedPrev    = Listing::query()
+            ->where('status', 'Rejected')
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
+            ->count();
 
-    $totalActive        = Listing::query()->active()->count();
-    $totalActiveCurrent = Listing::query()->active()
-        ->whereBetween('created_at', [$currentStart, $currentEnd])
-        ->count();
-    $totalActivePrev    = Listing::query()->active()
-        ->whereBetween('created_at', [$prevStart, $prevEnd])
-        ->count();
+        $totalActive        = Listing::query()->active()->count();
+        $totalActiveCurrent = Listing::query()->active()
+            ->whereBetween('created_at', [$currentStart, $currentEnd])
+            ->count();
+        $totalActivePrev    = Listing::query()->active()
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
+            ->count();
 
-    $makeStat = function (int $total, int $current, int $prev): array {
-        if ($prev === 0) {
-            $percent = $current > 0 ? 100.0 : 0.0;
-        } else {
-            $percent = round((($current - $prev) / $prev) * 100, 2);
-        }
+        $makeStat = function (int $total, int $current, int $prev): array {
+            if ($prev === 0) {
+                $percent = $current > 0 ? 100.0 : 0.0;
+            } else {
+                $percent = round((($current - $prev) / $prev) * 100, 2);
+            }
 
-        return [
-            'count'     => $total,
-            'percent'   => $percent,             // 8.5 مثلاً
-            'direction' => $percent >= 0 ? 'up' : 'down', // علشان الفرونت يحط علامة + أو سهم
-        ];
-    };
+            return [
+                'count'     => $total,
+                'percent'   => $percent,             // 8.5 مثلاً
+                'direction' => $percent >= 0 ? 'up' : 'down', // علشان الفرونت يحط علامة + أو سهم
+            ];
+        };
 
-    return response()->json([
-        'cards' => [
-            'rejected' => $makeStat($totalRejected, $totalRejectedCurrent, $totalRejectedPrev),
-            'pending'  => $makeStat($totalPending,  $totalPendingCurrent,  $totalPendingPrev),
-            'active'   => $makeStat($totalActive,   $totalActiveCurrent,   $totalActivePrev),
-            'total'    => $makeStat($totalAll,      $totalAllCurrent,      $totalAllPrev),
-        ],
-        'periods' => [
-            'current_month' => [
-                'start' => $currentStart->toDateString(),
-                'end'   => $currentEnd->toDateString(),
+        return response()->json([
+            'cards' => [
+                'rejected' => $makeStat($totalRejected, $totalRejectedCurrent, $totalRejectedPrev),
+                'pending'  => $makeStat($totalPending,  $totalPendingCurrent,  $totalPendingPrev),
+                'active'   => $makeStat($totalActive,   $totalActiveCurrent,   $totalActivePrev),
+                'total'    => $makeStat($totalAll,      $totalAllCurrent,      $totalAllPrev),
             ],
-            'previous_month' => [
-                'start' => $prevStart->toDateString(),
-                'end'   => $prevEnd->toDateString(),
+            'periods' => [
+                'current_month' => [
+                    'start' => $currentStart->toDateString(),
+                    'end'   => $currentEnd->toDateString(),
+                ],
+                'previous_month' => [
+                    'start' => $prevStart->toDateString(),
+                    'end'   => $prevEnd->toDateString(),
+                ],
             ],
-        ],
-    ]);
-}
+        ]);
+    }
     public function recentActivities(Request $request): JsonResponse
     {
         $limit = (int) $request->query('limit', 20);
@@ -203,7 +203,7 @@ class StatsController extends Controller
         ]);
     }
 
-    
+
     public function usersSummary(Request $request): JsonResponse
     {
         $perPage = (int) $request->query('per_page', 20);
@@ -255,6 +255,31 @@ class StatsController extends Controller
         $perPage = (int) $request->query('per_page', 50);
         $listings = Listing::query()
             ->where('status', 'Pending')
+            ->whereNotNull('publish_via')
+            ->with(['attributes', 'governorate', 'city', 'make', 'model', 'mainSection', 'subSection', 'user'])
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        $items = ListingResource::collection(collect($listings->items()));
+
+        return response()->json([
+            'meta' => [
+                'page' => $listings->currentPage(),
+                'per_page' => $listings->perPage(),
+                'total' => $listings->total(),
+                'last_page' => $listings->lastPage(),
+            ],
+            'listings' => $items,
+        ]);
+    }
+
+    public function adsNOTPayment(Request $request)
+    {
+        $perPage = (int) $request->query('per_page', 50);
+        $listings = Listing::query()
+            ->where('status', 'Pending')
+            ->where('publish_via',null)
+            ->where('isPayment',false)
             ->with(['attributes', 'governorate', 'city', 'make', 'model', 'mainSection', 'subSection', 'user'])
             ->orderByDesc('created_at')
             ->paginate($perPage);
@@ -289,11 +314,10 @@ class StatsController extends Controller
                 ->where('payment_status', 'paid')
                 ->orderByDesc('id')
                 ->first();
-            if ($sub ) {
+            if ($sub) {
                 $expireTs = $sub->expires_at;
             }
-        }
-        else if (!$expireTs && $publishVia === env('LISTING_PUBLISH_VIA_PACKAGE', 'package')) {
+        } else if (!$expireTs && $publishVia === env('LISTING_PUBLISH_VIA_PACKAGE', 'package')) {
             $pkg = UserPackages::where('user_id', $listing->user_id)->first();
             if ($pkg) {
                 if ($plan === 'featured') {
@@ -302,9 +326,8 @@ class StatsController extends Controller
                     $expireTs = $pkg->standard_expire_date;  // null means unlimited
                 }
             }
-        }
-        else{
-                $days = 365;
+        } else {
+            $days = 365;
             $expireTs = now()->copy()->addDays($days);
         }
 
@@ -315,7 +338,7 @@ class StatsController extends Controller
 
         // $comment = $request->input('admin_comment');
         // if ($comment !== null) {
-            $listing->admin_comment =null;
+        $listing->admin_comment = null;
         // }
 
         $listing->save();

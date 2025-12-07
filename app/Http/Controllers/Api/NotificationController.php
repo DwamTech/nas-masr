@@ -50,7 +50,7 @@ class NotificationController extends Controller
             'has_new' => $count > 0,
         ]);
     }
-
+//Admin create notification 
     public function store(Request $request, NotificationService $service)
     {
         $data = $request->validate([

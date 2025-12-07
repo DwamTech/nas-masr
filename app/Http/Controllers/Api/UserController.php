@@ -102,6 +102,7 @@ class UserController extends Controller
     //my ads 
     public function myAds(Request $request)
     {
+        Listing::autoExpire();
         $user = $request->user();
         $slug = $request->query('category_slug');
         $status = $request->query('status');
@@ -795,7 +796,7 @@ class UserController extends Controller
                 'amount' => $amount,
                 'currency' => $listing->currency,
                 'paid_at' => $paidAt,
-                'payment_reference' => $request->input('payment_reference')??'<transaction-id-from-gateway>',
+                'payment_reference' => $request->input('payment_reference') ?? '<transaction-id-from-gateway>',
                 'status' => 'paid',
                 'payment_method' => $request->input('payment_method'),
             ]
