@@ -311,6 +311,8 @@ class StatsController extends Controller
             $sec = Section::fromId((int) $l->category_id);
             return [
                 'status' => 'منشور',
+                'id' => $l->id,
+                'category_slug' => $sec?->slug,
                 'category_name' => $sec?->name,
                 'published_at' => optional($l->published_at)->toDateString(),
                 'expire_at' => optional($l->expire_at)->toDateString(),
@@ -346,7 +348,9 @@ class StatsController extends Controller
             $sec = Section::fromId((int) $l->category_id);
             return [
                 'status' => 'مرفوض',
+                'id' => $l->id,
                 'category_name' => $sec?->name,
+                'category_slug' => $sec?->slug,
                 'created_at' => optional($l->created_at)->toDateString(),
                 'expire_at' => optional($l->expire_at)->toDateString(),
                 'rejected_by' => 'مشرف النظام',
