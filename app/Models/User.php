@@ -8,7 +8,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Models\Listing;
+use App\Models\UserConversation;
 
 
 class User extends Authenticatable
@@ -64,8 +66,71 @@ class User extends Authenticatable
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public function listings(): HasMany
     {
         return $this->hasMany(Listing::class);
     }
+
+    /**
+     * Get all messages sent by this user.
+     */
+    public function sentMessages(): MorphMany
+    {
+        return $this->morphMany(UserConversation::class, 'sender');
+    }
+
+    /**
+     * Get all messages received by this user.
+     */
+    public function receivedMessages(): MorphMany
+    {
+        return $this->morphMany(UserConversation::class, 'receiver');
+    }
+
+    /**
+     * Get all conversations this user is part of (sent or received).
+     */
+    public function conversations()
+    {
+        return UserConversation::forUser($this->id, self::class)
+            ->select('conversation_id')
+            ->distinct();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Chat Helper Methods
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Get unread messages count for this user.
+     */
+    public function unreadMessagesCount(): int
+    {
+        return $this->receivedMessages()->unread()->count();
+    }
+
+    /**
+     * Get unread messages for this user.
+     */
+    public function unreadMessages()
+    {
+        return $this->receivedMessages()->unread()->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Check if user is admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
 }
+

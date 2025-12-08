@@ -5,6 +5,9 @@ use App\Http\Controllers\Admin\CategoryFieldsController;
 use App\Http\Controllers\Admin\CategoryPlanPricesController;
 use App\Http\Controllers\Admin\CategorySectionsController;
 use App\Http\Controllers\Admin\PackagesController;
+use App\Http\Controllers\Admin\ChatController as AdminChatController;
+use App\Http\Controllers\Admin\MonitoringController;
+use App\Http\Controllers\Admin\BroadcastController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CarController;
 use App\Http\Controllers\Api\UserController;
@@ -22,6 +25,7 @@ use App\Http\Controllers\Admin\GovernorateController;
 use App\Http\Controllers\Admin\MakeController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\PlansController;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -117,6 +121,7 @@ Route::prefix('admin')
         Route::get('published-listings', [StatsController::class, 'publishedListings']);
         Route::get('rejected-listings', [StatsController::class, 'rejectedListings']);
         Route::patch('listings/{listing}/approve', [StatsController::class, 'approveListing']);
+        Route::patch('listings/{listing}/accept-not-payment', [StatsController::class, 'AcceptAdsNotPayment']);
         Route::patch('listings/{listing}/reject', [StatsController::class, 'rejectListing']);
         Route::get('transactions', [TransactionsController::class, 'index']);
 
@@ -171,6 +176,31 @@ Route::prefix('admin')
 
         Route::get('category-plan-prices', [CategoryPlanPricesController::class, 'index']);
         Route::post('category-plan-prices', [CategoryPlanPricesController::class, 'store']);
+
+        // Admin Support Chat Routes (Unified Inbox)
+        Route::prefix('support')->group(function () {
+            Route::get('/inbox', [AdminChatController::class, 'supportInbox']);
+            Route::get('/stats', [AdminChatController::class, 'stats']);
+            Route::post('/reply', [AdminChatController::class, 'reply']);
+            Route::get('/{user}', [AdminChatController::class, 'supportHistory']);
+            Route::patch('/{user}/read', [AdminChatController::class, 'markAsRead']);
+        });
+
+        // Monitoring Routes (Read-Only with special middleware)
+        Route::prefix('monitoring')->middleware('can.monitor.chat')->group(function () {
+            Route::get('/conversations', [MonitoringController::class, 'index']);
+            Route::get('/conversations/{conversationId}', [MonitoringController::class, 'show']);
+            Route::get('/search', [MonitoringController::class, 'search']);
+            Route::get('/stats', [MonitoringController::class, 'stats']);
+        });
+
+        // Broadcast Routes (Bulk Messages)
+        Route::prefix('broadcast')->group(function () {
+            Route::post('/', [BroadcastController::class, 'send']);
+            Route::post('/group', [BroadcastController::class, 'sendToGroup']);
+            Route::post('/preview', [BroadcastController::class, 'preview']);
+            Route::get('/history', [BroadcastController::class, 'history']);
+        });
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);
@@ -204,5 +234,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/read', [NotificationController::class, 'read']);
     Route::post('/plan-subscriptions', [SubscriptionController::class, 'subscribe']);
     Route::get('/my-subscription', [SubscriptionController::class, 'mySubscription']);
+
+    // Chat Routes
+    Route::prefix('chat')->group(function () {
+        Route::get('/inbox', [ChatController::class, 'inbox']);
+        Route::get('/unread-count', [ChatController::class, 'unreadCount']);
+        Route::post('/send', [ChatController::class, 'send']);
+        Route::get('/support', [ChatController::class, 'supportHistory']);
+        Route::post('/support', [ChatController::class, 'sendToSupport']);
+        Route::get('/{user}', [ChatController::class, 'history']);
+        Route::patch('/{conversationId}/read', [ChatController::class, 'markAsRead']);
+    });
 });
 Route::post('/settings/notifications', [UserController::class, 'updateNotificationSettings']);

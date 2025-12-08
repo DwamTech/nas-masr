@@ -56,7 +56,9 @@ class GenericListingRequest extends FormRequest
                 }
             }
 
-            $rules['plan_type'] = ['sometimes', 'string', 'in:standard,premium,featured,free'];
+            $rules['plan_type'] = $section->slug === 'missing'
+                ? ['sometimes', 'string', Rule::in(['free'])]
+                : ['sometimes', 'string', Rule::in(['standard','premium','featured','free'])];
         }
 
         return $rules;

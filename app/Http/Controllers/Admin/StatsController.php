@@ -422,8 +422,30 @@ class StatsController extends Controller
         //     ]
         // ]);
     }
-    //Admin  accsept ads not payment
-    public function AcceptAdsNotPayment(Request $request) {}
+    //Admin  accept ads not payment
+    // public function AcceptAdsNotPayment(Request $request, Listing $listing): JsonResponse
+    // {
+    //     $plan = strtolower($listing->plan_type ?? 'standard');
+    //     // $prices = CategoryPlanPrice::where('category_id', $listing->category_id)->first();
+    //     $days = 365;
+    //     if ($plan === 'featured') {
+    //         $days = (int) ($prices->featured_days ?? 0);
+    //     } elseif ($plan === 'standard') {
+    //         $days = (int) ($prices->standard_days ?? 0);
+    //     } else {
+    //         $days = 365;
+    //     }
+
+    //     $listing->status = 'Valid';
+    //     $listing->admin_approved = true;
+    //     $listing->published_at = now();
+    //     $listing->expire_at = $days > 0 ? now()->copy()->addDays($days) : null;
+    //     $listing->publish_via = env('LISTING_PUBLISH_VIA_FREE', 'free');
+    //     $listing->admin_comment = null;
+    //     $listing->save();
+
+    //     return response()->json(new ListingResource($listing->load(['attributes', 'governorate', 'city', 'make', 'model', 'mainSection', 'subSection'])));
+    // }
 
     public function rejectListing(Request $request, Listing $listing): JsonResponse
     {

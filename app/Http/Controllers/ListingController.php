@@ -66,6 +66,28 @@ class ListingController extends Controller
 
             $q->where('plan_type', $plan);
         }
+        if ($sec->supportsMakeModel()) {
+            $makeId = $request->query('make_id');
+            $makeName = $request->query('make');
+            $modelId = $request->query('model_id');
+            $modelName = $request->query('model');
+
+            if ($makeId) {
+                $q->where('make_id', (int) $makeId);
+            } elseif ($makeName) {
+                $q->whereHas('make', function ($qq) use ($makeName) {
+                    $qq->where('name', 'like', '%' . trim($makeName) . '%');
+                });
+            }
+
+            if ($modelId) {
+                $q->where('model_id', (int) $modelId);
+            } elseif ($modelName) {
+                $q->whereHas('model', function ($qq) use ($modelName) {
+                    $qq->where('name', 'like', '%' . trim($modelName) . '%');
+                });
+            }
+        }
         if ($sec->supportsSections()) {
             $mainSectionId = $request->query('main_section_id');
             $subSectionId = $request->query('sub_section_id');
@@ -277,47 +299,49 @@ class ListingController extends Controller
                 }
             }
         } else {
-            $freeCount = Cache::remember('settings:free_ads_count', now()->addHours(6), function () {
-                return (int) (SystemSetting::where('key', 'free_ads_count')->value('value') ?? 0);
-            });
-            $freeMaxPrice = Cache::remember('settings:free_ads_max_price', now()->addHours(6), function () {
-                return (int) (SystemSetting::where('key', 'free_ads_max_price')->value('value') ?? 0);
-            });
-
             $freeVia = env('LISTING_PUBLISH_VIA_FREE', 'free');
-            $userFreeCount = Listing::query()
-                ->where('user_id', $user->id)
-                ->where(function ($q) use ($freeVia) {
-                    $q->where('publish_via', $freeVia)->orWhere('plan_type', 'free');
-                })
-                ->whereIn('status', ['Valid', 'Pending'])
-                ->count();
+            if ($sec->slug != 'missing') {
+                $freeCount = Cache::remember('settings:free_ads_count', now()->addHours(6), function () {
+                    return (int) (SystemSetting::where('key', 'free_ads_count')->value('value') ?? 0);
+                });
+                $freeMaxPrice = Cache::remember('settings:free_ads_max_price', now()->addHours(6), function () {
+                    return (int) (SystemSetting::where('key', 'free_ads_max_price')->value('value') ?? 0);
+                });
 
-            $priceVal = (float) ($data['price'] ?? 0);
-            $overCount = ($freeCount > 0 && $userFreeCount >= $freeCount);
-            $overPrice = ($freeMaxPrice > 0 && $priceVal > $freeMaxPrice);
+                $userFreeCount = Listing::query()
+                    ->where('user_id', $user->id)
+                    ->where(function ($q) use ($freeVia) {
+                        $q->where('publish_via', $freeVia)->orWhere('plan_type', 'free');
+                    })
+                    ->whereIn('status', ['Valid', 'Pending'])
+                    ->count();
 
-            if ($overCount || $overPrice) {
-                $paymentRequired = true;
+                $priceVal = (float) ($data['price'] ?? 0);
+                $overCount = ($freeCount > 0 && $userFreeCount >= $freeCount);
+                $overPrice = ($freeMaxPrice > 0 && $priceVal > $freeMaxPrice);
 
-                $message = null;
+                if ($overCount || $overPrice) {
+                    // $paymentRequired = true;
 
-                if ($overCount && $overPrice) {
-                    return Response()->json([
-                        'success' => false,
-                        'message' => ' لقد تجاوزت الحد الأقصى لعدد الإعلانات المجانية في هذا القسم، كما أن سعر هذا الإعلان أعلى من الحد المسموح به للإعلان المجاني. لنشر هذا الإعلان، يُرجى الاشتراك في باقة مدفوعة أو دفع تكلفة إعلان منفرد مع تغير نوع الخطه  لهذا الاعلان .',
-                    ], 402);
-                } elseif ($overCount) {
-                    return Response()->json([
-                        'success' => false,
-                        'message' => ' لقد تجاوزت الحد الأقصى لعدد الإعلانات المجانية المسموح بها في هذا القسم. لنشر المزيد من الإعلانات، يُرجى الاشتراك في باقة مدفوعة أو دفع تكلفة إعلان منفرد. مع تغير نوع الخطه  لهذا الاعلان'
+                    $message = null;
 
-                    ], 402);
-                } elseif ($overPrice) {
-                    return Response()->json([
-                        'success' => false,
-                        'message' => 'سعر هذا الإعلان أعلى من الحد الأقصى المسموح به للإعلان المجاني في هذا القسم. يمكنك إمّا تخفيض السعر ليتوافق مع الحد المجاني أو الاشتراك في باقة مدفوعة لنشر الإعلان. مع تغير نوع الخطه  لهذا الاعلان'
-                    ], 402);
+                    if ($overCount && $overPrice) {
+                        return Response()->json([
+                            'success' => false,
+                            'message' => ' لقد تجاوزت الحد الأقصى لعدد الإعلانات المجانية في هذا القسم، كما أن سعر هذا الإعلان أعلى من الحد المسموح به للإعلان المجاني. لنشر هذا الإعلان، يُرجى الاشتراك في باقة مدفوعة أو دفع تكلفة إعلان منفرد مع تغير نوع الخطه  لهذا الاعلان .',
+                        ], 402);
+                    } elseif ($overCount) {
+                        return Response()->json([
+                            'success' => false,
+                            'message' => ' لقد تجاوزت الحد الأقصى لعدد الإعلانات المجانية المسموح بها في هذا القسم. لنشر المزيد من الإعلانات، يُرجى الاشتراك في باقة مدفوعة أو دفع تكلفة إعلان منفرد. مع تغير نوع الخطه  لهذا الاعلان'
+
+                        ], 402);
+                    } elseif ($overPrice) {
+                        return Response()->json([
+                            'success' => false,
+                            'message' => 'سعر هذا الإعلان أعلى من الحد الأقصى المسموح به للإعلان المجاني في هذا القسم. يمكنك إمّا تخفيض السعر ليتوافق مع الحد المجاني أو الاشتراك في باقة مدفوعة لنشر الإعلان. مع تغير نوع الخطه  لهذا الاعلان'
+                        ], 402);
+                    }
                 }
             } else {
                 $data['publish_via'] = $freeVia;
@@ -325,6 +349,8 @@ class ListingController extends Controller
                 $priceOut = 0.0;
             }
         }
+
+
 
         if ($paymentRequired) {
             $data['status'] = 'Pending';

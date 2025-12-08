@@ -128,8 +128,16 @@ final class Section
     }
     public function rules(): array
     {
+        $priceRules = $this->slug === 'missing'
+            ? ['nullable', 'numeric', 'min:0']
+            : ['required', 'numeric', 'min:0'];
+
+        $planRules = $this->slug === 'missing'
+            ? ['required', 'string', 'in:free']
+            : ['required', 'string', 'in:standard,premium,featured,free'];
+
         $base = [
-            'price' => ['required', 'numeric', 'min:0'],
+            'price' => $priceRules,
             'description' => ['required', 'string'],
 
             'governorate_id' => ['nullable', 'integer', 'exists:governorates,id'],
@@ -144,7 +152,7 @@ final class Section
             'main_image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'images' => ['nullable', 'array', 'max:20'],
             'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            "plan_type" => ['required', 'string', 'in:standard,premium,featured,free'],
+            "plan_type" => $planRules,
             'contact_phone' => ['nullable', 'string', 'max:20'],
             'whatsapp_phone' => ['nullable', 'string', 'max:20'],
             'country_code' => ['nullable', 'string', 'max:20'],
