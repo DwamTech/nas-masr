@@ -5,18 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Listing;
 use App\Models\ListingReport;
 use App\Models\SystemSetting;
+use App\Services\NotificationService;
 use App\Support\Section;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 
 class ListingReportController extends Controller
 {
     /**
      * Store a newly created report in storage.
      */
-    public function store(Request $request, Listing $listing): JsonResponse
+    public function store(Request $request, Listing $listing, NotificationService $notificationService): JsonResponse
     {
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:255'],
@@ -30,6 +30,17 @@ class ListingReportController extends Controller
             'details' => $data['details'] ?? null,
             'status' => 'pending',
         ]);
+
+        // Notify the listing owner about the new report
+        if ($listing->user_id) {
+            $notificationService->dispatch(
+                $listing->user_id,
+                'بلاغ جديد على إعلانك',
+                "تم تقديم بلاغ على إعلانك: {$listing->title}. السبب: {$data['reason']}",
+                'report_received',
+                ['listing_id' => $listing->id, 'report_id' => $report->id]
+            );
+        }
 
         return response()->json([
             'message' => 'Report submitted successfully',
@@ -111,7 +122,7 @@ class ListingReportController extends Controller
     /**
      * Accept the report (Listing will be rejected).
      */
-    public function acceptReport(Listing $listing): JsonResponse
+    public function acceptReport(Listing $listing, NotificationService $notificationService): JsonResponse
     {
         // Get the reason from the latest pending report before updating
         $latestReport = $listing->reports()->where('status', 'pending')->latest()->first();
@@ -128,6 +139,17 @@ class ListingReportController extends Controller
             'admin_comment' => $reason
         ]);
 
+        // Notify the listing owner
+        if ($listing->user_id) {
+            $notificationService->dispatch(
+                $listing->user_id,
+                'تم قبول البلاغ ضد إعلانك',
+                "تم مراجعة البلاغ وقبوله، وبناءً عليه تم رفض الإعلان. السبب: {$reason}",
+                'report_accepted',
+                ['listing_id' => $listing->id]
+            );
+        }
+
         return response()->json([
             'message' => 'Report accepted, listing has been rejected.',
         ]);
@@ -136,7 +158,7 @@ class ListingReportController extends Controller
     /**
      * Dismiss/Reject the report (Listing stays valid).
      */
-    public function dismissReport(Listing $listing): JsonResponse
+    public function dismissReport(Listing $listing, NotificationService $notificationService): JsonResponse
     {
         // Mark all pending reports for this listing as dismissed
         $listing->reports()->where('status', 'pending')->update([
@@ -172,10 +194,23 @@ class ListingReportController extends Controller
             ]);
         // }
 
+        // Notify the listing owner
+        if ($listing->user_id) {
+            $notificationService->dispatch(
+                $listing->user_id,
+                'تم رفض البلاغ ضد إعلانك',
+                "تم مراجعة البلاغ ورفضه. إعلانك سليم ومتاح للعرض.",
+                'report_dismissed',
+                ['listing_id' => $listing->id]
+            );
+        }
+
         return response()->json([
             'message' => 'Report dismissed, listing remains valid.',
         ]);
     }
+
+   
 
     /**
      * Remove the specified report (Admin only).

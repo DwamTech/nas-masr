@@ -124,6 +124,7 @@ Route::prefix('admin')
         Route::patch('listings/{listing}/approve', [StatsController::class, 'approveListing']);
         Route::patch('listings/{listing}/accept-not-payment', [StatsController::class, 'AcceptAdsNotPayment']);
         Route::patch('listings/{listing}/reject', [StatsController::class, 'rejectListing']);
+        Route::patch('/listings/{listing}/reopen', [StatsController::class, 'reopen']);
         Route::get('transactions', [TransactionsController::class, 'index']);
 
         // Admin Users management
@@ -182,6 +183,7 @@ Route::prefix('admin')
         Route::get('listing-reports', [ListingReportController::class, 'index']);
         Route::post('listing-reports/{listing}/accept', [ListingReportController::class, 'acceptReport']);
         Route::post('listing-reports/{listing}/dismiss', [ListingReportController::class, 'dismissReport']);
+        // Route::post('listing-reports/{listing}/reopen', [ListingReportController::class, 'reopen']);
         Route::delete('listing-reports/{report}', [ListingReportController::class, 'destroy']);
 
         // Admin Support Chat Routes (Unified Inbox)

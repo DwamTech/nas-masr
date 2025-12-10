@@ -17,6 +17,7 @@ use App\Models\Notification;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
@@ -500,5 +501,58 @@ class StatsController extends Controller
         );
 
         return response()->json(new ListingResource($listing->load(['attributes', 'governorate', 'city', 'make', 'model', 'mainSection', 'subSection'])));
+    }
+
+    /**
+     * Reopen/Re-evaluate the rejected listing.
+     */
+    public function reopen(Listing $listing, NotificationService $notificationService): JsonResponse
+    {
+        if ($listing->status !== 'Rejected') {
+            return response()->json([
+                'message' => 'Listing is not rejected.',
+            ], 400);
+        }
+
+        // Reset listing status to Pending (or Valid depending on logic, usually Pending for re-review)
+        // If automatic approval is ON, we might want to set it to Valid directly.
+        // For now, let's stick to Pending to be safe, allowing admin to approve it properly.
+        // However, if the admin clicked "Re-evaluate", they might expect it to be active if they think it's valid.
+        // Let's check the system setting here again or just default to Pending.
+
+        // Let's check for automatic approval setting just in case
+        $manualApprove = Cache::remember('settings:manual_approval', now()->addHours(6), function () {
+            $val = SystemSetting::where('key', 'manual_approval')->value('value');
+            return (int) $val === 1;
+        });
+
+        if ($manualApprove) {
+            $listing->update([
+                'status' => 'Pending',
+                'admin_comment' => null,
+                'admin_approved' => false,
+            ]);
+        } else {
+            $listing->update([
+                'status' => 'Valid',
+                'admin_approved' => true,
+                'admin_comment' => null,
+            ]);
+        }
+
+        // Notify the listing owner
+        if ($listing->user_id) {
+            $notificationService->dispatch(
+                $listing->user_id,
+                'إعادة النظر في إعلانك',
+                "تم إعادة فتح إعلانك للمراجعة مرة أخرى.",
+                'listing_reopened',
+                ['listing_id' => $listing->id]
+            );
+        }
+
+        return response()->json([
+            'message' => 'Listing reopened for review.',
+        ]);
     }
 }

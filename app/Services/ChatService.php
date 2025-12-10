@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\MessageSent;
 use App\Models\User;
 use App\Models\UserConversation;
 use Illuminate\Support\Str;
@@ -104,7 +105,7 @@ class ChatService
     ): UserConversation {
         $conversationId = $this->getConversationId($sender, $receiver, $type);
 
-        return UserConversation::create([
+        $conversation = UserConversation::create([
             'conversation_id' => $conversationId,
             'sender_id' => $sender->id,
             'sender_type' => User::class,
@@ -113,6 +114,11 @@ class ChatService
             'message' => $message,
             'type' => $type,
         ]);
+
+        // Dispatch real-time event
+        event(new MessageSent($conversation));
+
+        return $conversation;
     }
 
     /**
