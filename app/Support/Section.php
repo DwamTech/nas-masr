@@ -103,7 +103,8 @@ final class Section
             'heavy-transport',
             'tools',
             'missing',
-            'spare-parts'
+            'spare-parts',
+            'jobs',
         ], true);
     }
 

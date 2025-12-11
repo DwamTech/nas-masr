@@ -57,48 +57,7 @@ class CategoryFieldsSeeder extends Seeder
 
 
         $jobsFields = [
-            [
-                'category_slug' => 'jobs',
-                'field_name' => 'job_category',
-                'display_name' => 'التصنيف',
-                'type' => 'string',
-                'options' => [
-                    'إدارة',
-                    'محاسبة ومالية',
-                    'مبيعات',
-                    'تسويق',
-                    'تكنولوجيا معلومات',
-                    'تعليم وتدريب',
-                    'طب وتمريض',
-                    'خدمة عملاء',
-                    'حرف وصناعات',
-                    'سياحة وفنادق',
-                ],
-                'required' => true,
-                'filterable' => true,
-                'sort_order' => 1,
-            ],
-            [
-                'category_slug' => 'jobs',
-                'field_name' => 'specialization',
-                'display_name' => 'التخصص',
-                'type' => 'string',
-                'options' => [
-                    'محاسب',
-                    'مسؤول موارد بشرية',
-                    'مندوب مبيعات',
-                    'مسوّق رقمي',
-                    'مبرمج',
-                    'مصمم جرافيك',
-                    'مدرس',
-                    'ممرض',
-                    'سكرتارية',
-                    'سائق',
-                ],
-                'required' => true,
-                'filterable' => true,
-                'sort_order' => 2,
-            ],
+
             [
                 'category_slug' => 'jobs',
                 'field_name' => 'salary',
