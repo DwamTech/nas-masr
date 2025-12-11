@@ -161,6 +161,16 @@ class CategoryFieldsSeeder extends Seeder
         // 🔹 حقول المدرسين
         $teachersFields = [
             [
+                'category_slug' => 'teachers',
+                'field_name' => 'name',
+                'display_name' => 'الاسم',
+                'type' => 'string',
+                'options' => [],
+                'required' => true,
+                'filterable' => false,
+                'sort_order' => 0,
+            ],
+            [
                 'category_slug' => 'teachers', // غيّريه لو السلاج مختلف عندك
                 'field_name' => 'specialization',
                 'display_name' => 'التخصص',
