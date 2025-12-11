@@ -179,14 +179,37 @@ class Listing extends Model
 
     public function scopeKeyword(Builder $q, ?string $kw): Builder
     {
+        $rawKw = trim((string)$kw);
         $kw = self::normalizeArabic($kw);
         if (!$kw) {
             return $q;
         }
 
-        return $q->where(function ($qq) use ($kw) {
+        return $q->where(function ($qq) use ($kw, $rawKw) {
             $qq->whereRaw('REPLACE(REPLACE(REPLACE(title,"أ","ا"),"إ","ا"),"آ","ا") like ?', ["%{$kw}%"])
-                ->orWhereRaw('REPLACE(REPLACE(REPLACE(description,"أ","ا"),"إ","ا"),"آ","ا") like ?', ["%{$kw}%"]);
+                ->orWhereRaw('REPLACE(REPLACE(REPLACE(description,"أ","ا"),"إ","ا"),"آ","ا") like ?', ["%{$kw}%"])
+                ->orWhere('address', 'like', "%{$rawKw}%")
+                ->orWhereHas('governorate', function ($q) use ($rawKw) {
+                    $q->where('name', 'like', "%{$rawKw}%");
+                })
+                ->orWhereHas('city', function ($q) use ($rawKw) {
+                    $q->where('name', 'like', "%{$rawKw}%");
+                })
+                ->orWhereHas('make', function ($q) use ($rawKw) {
+                    $q->where('name', 'like', "%{$rawKw}%");
+                })
+                ->orWhereHas('model', function ($q) use ($rawKw) {
+                    $q->where('name', 'like', "%{$rawKw}%");
+                })
+                ->orWhereHas('mainSection', function ($q) use ($rawKw) {
+                    $q->where('name', 'like', "%{$rawKw}%");
+                })
+                ->orWhereHas('subSection', function ($q) use ($rawKw) {
+                    $q->where('name', 'like', "%{$rawKw}%");
+                })
+                ->orWhereHas('attributes', function ($q) use ($rawKw) {
+                    $q->where('value_string', 'like', "%{$rawKw}%");
+                });
         });
     }
 
