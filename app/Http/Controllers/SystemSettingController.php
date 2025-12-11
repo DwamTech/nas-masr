@@ -215,7 +215,7 @@ class SystemSettingController extends Controller
     public function uploadDefaultImage(Request $request)
     {
         $request->validate([
-            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:50120'],
             'key' => ['required', 'string', 'in:jobs_default_image'],
         ]);
 
