@@ -108,6 +108,10 @@ class SubscriptionController extends Controller
             ? (float) ($prices->featured_ad_price ?? 0)
             : (float) ($prices->standard_ad_price ?? 0);
 
+        $adsTotal = $plan === 'featured'
+            ? (int) ($prices->featured_ads_count ?? 0)
+            : (int) ($prices->standard_ads_count ?? 0);
+
         $start   = now();
         $expires = $days > 0 ? now()->copy()->addDays($days) : null;
 
@@ -123,6 +127,8 @@ class SubscriptionController extends Controller
                 'expires_at'        => $expires,
                 'price'             => $price,
                 'ad_price'          => $adPrice,
+                'ads_total'         => $adsTotal,
+                'ads_used'          => 0,
                 'payment_status'    => 'paid',
                 'payment_reference' => $data['payment_reference']??' "<transaction-id-from-gateway>"',
                 'payment_method'    => $data['payment_method'], 

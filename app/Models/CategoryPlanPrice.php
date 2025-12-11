@@ -13,11 +13,13 @@ class CategoryPlanPrice extends Model
 
         'price_featured',      
         'featured_ad_price', 
-        'featured_days',  
+        'featured_days',
+        'featured_ads_count',
 
         'price_standard',      
         'standard_ad_price',   
-        'standard_days',       
+        'standard_days',
+        'standard_ads_count',       
     ];
 
     public function category()

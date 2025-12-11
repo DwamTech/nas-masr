@@ -25,11 +25,13 @@ class CategoryPlanPricesController extends Controller
                     'price_featured'     => (float) ($price->price_featured ?? 0),
                     'featured_ad_price'  => (float) ($price->featured_ad_price ?? 0),
                     'featured_days'      => (int)   ($price->featured_days ?? 0),
+                    'featured_ads_count' => (int)   ($price->featured_ads_count ?? 0),
 
                     // ستاندرد
                     'price_standard'     => (float) ($price->price_standard ?? 0),
                     'standard_ad_price'  => (float) ($price->standard_ad_price ?? 0),
                     'standard_days'      => (int)   ($price->standard_days ?? 0),
+                    'standard_ads_count' => (int)   ($price->standard_ads_count ?? 0),
                 ];
             });
 
@@ -48,10 +50,12 @@ class CategoryPlanPricesController extends Controller
             'items.*.price_featured'          => ['required', 'numeric', 'min:0'],
             'items.*.featured_ad_price'       => ['required', 'numeric', 'min:0'],
             'items.*.featured_days'           => ['required', 'integer', 'min:0'],
+            'items.*.featured_ads_count'      => ['required', 'integer', 'min:0'],
 
             'items.*.price_standard'          => ['required', 'numeric', 'min:0'],
             'items.*.standard_ad_price'       => ['required', 'numeric', 'min:0'],
             'items.*.standard_days'           => ['required', 'integer', 'min:0'],
+            'items.*.standard_ads_count'      => ['required', 'integer', 'min:0'],
         ]);
 
         foreach ($data['items'] as $row) {
@@ -61,10 +65,12 @@ class CategoryPlanPricesController extends Controller
                     'price_featured'    => $row['price_featured']    ?? 0,
                     'featured_ad_price' => $row['featured_ad_price'] ?? 0,
                     'featured_days'     => $row['featured_days']     ?? 0,
+                    'featured_ads_count'=> $row['featured_ads_count']?? 0,
 
                     'price_standard'    => $row['price_standard']    ?? 0,
                     'standard_ad_price' => $row['standard_ad_price'] ?? 0,
                     'standard_days'     => $row['standard_days']     ?? 0,
+                    'standard_ads_count'=> $row['standard_ads_count']?? 0,
                 ]
             );
         }
