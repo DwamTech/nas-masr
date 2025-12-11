@@ -129,7 +129,7 @@ final class Section
     }
     public function rules(): array
     {
-        $priceRules = $this->slug === 'missing'
+        $priceRules = ($this->slug === 'missing' || $this->slug === 'jobs')
             ? ['nullable', 'numeric', 'min:0']
             : ['required', 'numeric', 'min:0'];
 
