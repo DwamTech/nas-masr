@@ -35,7 +35,7 @@ class GenericListingRequest extends FormRequest
         }
         if ($section->supportsSections()) {
             $extra['main_section_id'] = ['nullable', 'integer', 'exists:category_main_sections,id'];
-            $extra['sub_section_id'] = ['nullable', 'integer', 'exists:category_sub_sections,id'];
+            $extra['sub_section_id'] = ['nullable', 'integer', 'exists:category_sub_section,id'];
             $extra['main_section'] = ['nullable', 'string'];
             $extra['sub_section'] = ['nullable', 'string'];
         }
