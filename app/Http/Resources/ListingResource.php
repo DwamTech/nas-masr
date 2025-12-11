@@ -9,7 +9,18 @@ class ListingResource extends JsonResource
 {
     public function toArray($request): array
     {
-        $mainUrl = $this->main_image ? asset('storage/' . $this->main_image) : null;
+        $categorySlug = $this->category_id ? Section::fromId($this->category_id)?->slug : null;
+
+        if ($categorySlug === 'jobs') {
+            $defPath = \Illuminate\Support\Facades\Cache::remember(
+                'settings:jobs_default_image',
+                now()->addHours(6),
+                fn() => \App\Models\SystemSetting::where('key', 'jobs_default_image')->value('value')
+            );
+            $mainUrl = $defPath ? asset('storage/' . $defPath) : null;
+        } else {
+            $mainUrl = $this->main_image ? asset('storage/' . $this->main_image) : null;
+        }
 
         $gallery = [];
         $imgs = $this->images;

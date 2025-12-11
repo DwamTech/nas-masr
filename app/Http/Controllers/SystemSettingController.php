@@ -24,7 +24,8 @@ class SystemSettingController extends Controller
         'manual_approval',
         'enable_global_external_notif',
         'free_ads_count',
-        'free_ads_max_price'
+        'free_ads_max_price',
+        'jobs_default_image'
     ];
 
     // مفاتيح حسب النوع
@@ -209,5 +210,35 @@ class SystemSettingController extends Controller
         }
 
         abort(404);
+    }
+
+    public function uploadDefaultImage(Request $request)
+    {
+        $request->validate([
+            'image' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'key' => ['required', 'string', 'in:jobs_default_image'],
+        ]);
+
+        $file = $request->file('image');
+        $key = $request->input('key');
+
+        $path = $file->storeAs('defaults', $key . '.' . $file->getClientOriginalExtension(), 'public');
+
+        SystemSetting::updateOrCreate(
+            ['key' => $key],
+            [
+                'value' => $path,
+                'type' => 'string',
+                'group' => 'appearance',
+                'autoload' => true,
+            ]
+        );
+
+        $this->forgetCache($key);
+
+        return response()->json([
+            'status' => 'ok',
+            'url' => asset('storage/' . $path),
+        ]);
     }
 }

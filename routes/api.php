@@ -148,6 +148,7 @@ Route::prefix('admin')
         Route::post('/create-otp/{user}', [UserController::class, 'createOtp']);
 
         //system settings
+        Route::post('/system-settings/upload-image', [SystemSettingController::class, 'uploadDefaultImage']);
         Route::post('/system-settings', [SystemSettingController::class, 'store']);
         //User packages
         Route::post('/user-packages', [PackagesController::class, 'storeOrUpdate']);
