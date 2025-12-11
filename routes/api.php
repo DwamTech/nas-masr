@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\CategoryFieldsController;
 use App\Http\Controllers\Admin\CategoryPlanPricesController;
 use App\Http\Controllers\Admin\CategorySectionsController;
 use App\Http\Controllers\Admin\PackagesController;
+use App\Http\Controllers\Admin\UserSubscriptionsController;
 use App\Http\Controllers\Admin\ChatController as AdminChatController;
 use App\Http\Controllers\Admin\MonitoringController;
 use App\Http\Controllers\Admin\BroadcastController;
@@ -178,6 +179,14 @@ Route::prefix('admin')
 
         Route::get('category-plan-prices', [CategoryPlanPricesController::class, 'index']);
         Route::post('category-plan-prices', [CategoryPlanPricesController::class, 'store']);
+
+        // User Subscriptions (per category)
+        Route::get('user-subscriptions', [UserSubscriptionsController::class, 'index']);
+        Route::get('user-subscriptions/{id}', [UserSubscriptionsController::class, 'show']);
+        Route::post('user-subscriptions', [UserSubscriptionsController::class, 'store']);
+        Route::patch('user-subscriptions/{id}', [UserSubscriptionsController::class, 'update']);
+        Route::delete('user-subscriptions/{id}', [UserSubscriptionsController::class, 'destroy']);
+        Route::post('user-subscriptions/{id}/add-ads', [UserSubscriptionsController::class, 'addAds']);
 
         // Listing Reports (Admin)
         Route::get('listing-reports', [ListingReportController::class, 'index']);

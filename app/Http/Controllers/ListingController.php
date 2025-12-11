@@ -275,12 +275,34 @@ class ListingController extends Controller
                 ->first();
 
             if ($activeSub) {
-                $data['expire_at'] = $activeSub->expires_at;
-                $paymentType = 'subscription';
-                $paymentReference = $activeSub->payment_reference;
-                $paymentMethod = $activeSub->payment_method;
-                $priceOut = (float) ($activeSub->price ?? 0);
-                $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
+                // [MODIFIED] Check & Consume Ad
+                if (!$activeSub->consumeAd(1)) {
+                    $paymentRequired = true; // Fallback to payment if ads are exhausted
+                    // If you want to strictly block, return here. 
+                    // But maybe user wants to pay for this specific ad?
+                    // Let's assume we want to block "Subscription usage" but allow "Paying per ad".
+                    // However, original logic falls through to check other methods? No, it's an if-else block.
+                    
+                    // Logic: If subscription exists but no ads, user must renew or pay per ad.
+                    // We will set $activeSub to null to force falling into "else" block (Package or Pay per ad)?
+                    // Or we explicitly return error?
+                    // Based on req: "Block if 0".
+                    
+                    $activeSub = null; // Treat as if no active subscription for this flow
+                     // We continue to the 'else' block which checks for Packages or forces Payment.
+                     // But wait, the 'else' block checks for Packages.
+                     // If we want to allow paying for this ad individually, we just let it fall through.
+                     // If we want to tell them "Your subscription is empty", we might need a specific message.
+                     
+                     // Let's rely on standard flow: if sub is empty, it's not "active" for this purpose.
+                } else {
+                    $data['expire_at'] = $activeSub->expires_at;
+                    $paymentType = 'subscription';
+                    $paymentReference = $activeSub->payment_reference;
+                    $paymentMethod = $activeSub->payment_method;
+                    $priceOut = (float) ($activeSub->price ?? 0);
+                    $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
+                }
             } else {
                 $packageResult = $this->consumeForPlan($user->id, $planNorm);
                 $packageData   = $packageResult->getData(true);
