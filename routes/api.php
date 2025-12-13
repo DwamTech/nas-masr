@@ -271,5 +271,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{user}', [ChatController::class, 'history']);
         Route::patch('/{conversationId}/read', [ChatController::class, 'markAsRead']);
     });
+
+    Route::post('/listings/{listing}/renew', [ListingController::class, 'renew']);
 });
 Route::post('/settings/notifications', [UserController::class, 'updateNotificationSettings']);

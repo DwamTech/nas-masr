@@ -168,7 +168,7 @@ class ListingController extends Controller
                 'contact_phone' => $item->contact_phone,
                 'whatsapp_phone' => $item->whatsapp_phone,
                 'main_image_url' => ($categorySlug === 'jobs' || $categorySlug === 'doctors' || $categorySlug === 'teachers')
-                    ? ( asset('storage/' . \Illuminate\Support\Facades\Cache::remember("settings:{$categorySlug}_default_image", now()->addHours(6), fn() => \App\Models\SystemSetting::where('key', "{$categorySlug}_default_image")->value('value') ?? "defaults/{$categorySlug}_default.png")) )
+                    ? (asset('storage/' . \Illuminate\Support\Facades\Cache::remember("settings:{$categorySlug}_default_image", now()->addHours(6), fn() => \App\Models\SystemSetting::where('key', "{$categorySlug}_default_image")->value('value') ?? "defaults/{$categorySlug}_default.png")))
                     : ($item->main_image ? asset('storage/' . $item->main_image) : null),
                 'created_at' => $item->created_at,
                 'plan_type' => $item->plan_type,
@@ -284,19 +284,19 @@ class ListingController extends Controller
                     // But maybe user wants to pay for this specific ad?
                     // Let's assume we want to block "Subscription usage" but allow "Paying per ad".
                     // However, original logic falls through to check other methods? No, it's an if-else block.
-                    
+
                     // Logic: If subscription exists but no ads, user must renew or pay per ad.
                     // We will set $activeSub to null to force falling into "else" block (Package or Pay per ad)?
                     // Or we explicitly return error?
                     // Based on req: "Block if 0".
-                    
+
                     $activeSub = null; // Treat as if no active subscription for this flow
-                     // We continue to the 'else' block which checks for Packages or forces Payment.
-                     // But wait, the 'else' block checks for Packages.
-                     // If we want to allow paying for this ad individually, we just let it fall through.
-                     // If we want to tell them "Your subscription is empty", we might need a specific message.
-                     
-                     // Let's rely on standard flow: if sub is empty, it's not "active" for this purpose.
+                    // We continue to the 'else' block which checks for Packages or forces Payment.
+                    // But wait, the 'else' block checks for Packages.
+                    // If we want to allow paying for this ad individually, we just let it fall through.
+                    // If we want to tell them "Your subscription is empty", we might need a specific message.
+
+                    // Let's rely on standard flow: if sub is empty, it's not "active" for this purpose.
                 } else {
                     $data['expire_at'] = $activeSub->expires_at;
                     $paymentType = 'subscription';
@@ -437,6 +437,120 @@ class ListingController extends Controller
         ]);
     }
 
+    public function renew(Request $request, Listing $listing)
+    {
+        $user = $request->user();
+
+        if ($listing->user_id !== $user->id && $user->role !== 'admin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $sec = Section::fromId($listing->category_id);
+        if (!$sec) {
+            abort(404, 'Category not found or inactive');
+        }
+
+        $planType = $listing->plan_type ?? 'free';
+
+        if ($planType !== 'free') {
+            $planNorm = $this->normalizePlan($planType);
+            // Check subscription
+            $activeSub = UserPlanSubscription::query()
+                ->where('user_id', $user->id)
+                ->where('category_id', $sec->id())
+                ->where('plan_type', $planNorm)
+                ->where('payment_status', 'paid')
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+                })
+                ->first();
+
+            if ($activeSub && $activeSub->consumeAd(1)) {
+                $listing->update([
+                    'expire_at' => $activeSub->expires_at,
+                    'status' => 'Valid',
+                    'publish_via' => 'subscription',
+                    'isPayment' => true,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'تم تجديد الإعلان بنجاح عبر الاشتراك',
+                    'data' => new ListingResource($listing)
+                ]);
+            }
+
+            // Check package
+            $packageResult = $this->consumeForPlan($user->id, $planNorm);
+            $packageData   = $packageResult->getData(true);
+
+            if (!empty($packageData['success']) && $packageData['success'] === true) {
+                $listing->update([
+                    'expire_at' => Carbon::parse($packageData['expire_date']),
+                    'status' => 'Valid',
+                    'publish_via' => 'package',
+                    'isPayment' => true,
+                ]);
+                return response()->json([
+                    'success' => true,
+                    'message' => 'تم تجديد الإعلان بنجاح عبر الباقة',
+                    'data' => new ListingResource($listing)
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يوجد رصيد كافي في الاشتراك أو الباقة لتجديد الإعلان. يرجى الاشتراك أو شراء باقة.',
+                'payment_required' => true
+            ], 402);
+        } else {
+            // Free plan logic
+            $freeVia = env('LISTING_PUBLISH_VIA_FREE', 'free');
+            $freeCount = Cache::remember('settings:free_ads_count', now()->addHours(6), function () {
+                return (int) (SystemSetting::where('key', 'free_ads_count')->value('value') ?? 0);
+            });
+
+            $userFreeCount = Listing::query()
+                ->where('user_id', $user->id)
+                ->where(function ($q) use ($freeVia) {
+                    $q->where('publish_via', $freeVia)->orWhere('plan_type', 'free');
+                })
+                ->whereIn('status', ['Valid', 'Pending'])
+                ->where('id', '!=', $listing->id)
+                ->count();
+
+            $overCount = ($freeCount > 0 && ($userFreeCount + 1) > $freeCount);
+            $freeMaxPrice = Cache::remember('settings:free_ads_max_price', now()->addHours(6), function () {
+                return (int) (SystemSetting::where('key', 'free_ads_max_price')->value('value') ?? 0);
+            });
+            $priceVal = (float) $listing->price;
+            $overPrice = ($freeMaxPrice > 0 && $priceVal > $freeMaxPrice);
+
+            if ($overCount || $overPrice) {
+                $msg = 'لا يمكن تجديد الإعلان مجاناً.';
+                if ($overCount) $msg .= ' تجاوزت الحد الأقصى للإعلانات المجانية.';
+                if ($overPrice) $msg .= ' سعر الإعلان يتجاوز الحد المسموح للمجاني.';
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                ], 402);
+            }
+
+            $listing->update([
+                'expire_at' => now()->addDays(365),
+                'status' => 'Valid',
+                'publish_via' => 'free',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تجديد الإعلان المجاني بنجاح',
+                'data' => new ListingResource($listing)
+            ]);
+        }
+    }
+
     public function show(string $section, Listing $listing, NotificationService $notifications)
     {
         $sec = Section::fromSlug($section);
@@ -448,8 +562,8 @@ class ListingController extends Controller
             if ($viewer && $viewer->id !== $listing->user_id) {
                 $notifications->dispatch(
                     (int) $listing->user_id,
-                    'تمت مشاهدة إعلانك',
-                    'قام المستخدم #' . $viewer->id . ' بمشاهدة إعلانك #' . $listing->id,
+                    ' تمت مشاهدة إعلانك',
+                    'قام المستخدم #' . $viewer->id . ' بمشاهدة إعلانك #' . $listing->id . ' في قسم ' . $sec->name,
                     'view',
                     ['viewer_id' => (int) $viewer->id, 'listing_id' => (int) $listing->id]
                 );
@@ -604,16 +718,16 @@ class ListingController extends Controller
         // Format listings
         $listings = collect($results->items())->map(function ($item) use ($categories) {
             $cat = $categories->get($item->category_id);
-            
+
             // Get attributes as key-value
             $attrs = [];
             if ($item->relationLoaded('attributes')) {
                 foreach ($item->attributes as $attr) {
-                    $attrs[$attr->key] = $attr->value_string 
-                        ?? $attr->value_int 
-                        ?? $attr->value_decimal 
-                        ?? $attr->value_bool 
-                        ?? $attr->value_date 
+                    $attrs[$attr->key] = $attr->value_string
+                        ?? $attr->value_int
+                        ?? $attr->value_decimal
+                        ?? $attr->value_bool
+                        ?? $attr->value_date
                         ?? null;
                 }
             }

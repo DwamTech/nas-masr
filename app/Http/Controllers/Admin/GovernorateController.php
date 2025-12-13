@@ -12,6 +12,11 @@ class GovernorateController extends Controller
     public function index()
     {
         $items = Governorate::with('cities')->orderBy('name')->get();
+        $items->push((object)[
+            'id' => null,
+            'name' => 'غير ذلك',
+            'cities' => []
+        ]);
         return response()->json($items);
     }
 
@@ -74,7 +79,13 @@ class GovernorateController extends Controller
 
     public function cities(Governorate $governorate)
     {
-        return response()->json($governorate->cities()->orderBy('name')->get());
+        $cities = $governorate->cities()->orderBy('name')->get();
+        $cities->push((object)[
+            'id' => null,
+            'name' => 'غير ذلك',
+            'governorate_id' => $governorate->id
+        ]);
+        return response()->json($cities);
     }
 
     // public function addCity(Request $request, Governorate $governorate)

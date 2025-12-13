@@ -280,8 +280,10 @@ class StatsController extends Controller
         $perPage = (int) $request->query('per_page', 50);
         $listings = Listing::query()
             ->where('status', 'Pending')
+            
             ->where('publish_via', null)
             ->where('isPayment', false)
+            ->where('plan_type', '!=', 'free')
             ->with(['attributes', 'governorate', 'city', 'make', 'model', 'mainSection', 'subSection', 'user'])
             ->orderByDesc('created_at')
             ->paginate($perPage);

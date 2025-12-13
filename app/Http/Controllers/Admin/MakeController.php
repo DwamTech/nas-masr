@@ -16,6 +16,11 @@ class MakeController extends Controller
     public function index()
     {
         $items = Make::with('models')->orderBy('name')->get();
+        $items->push((object)[
+            'id' => null,
+            'name' => 'غير ذلك',
+            'models' => []
+        ]);
         return response()->json($items);
     }
 
@@ -119,7 +124,13 @@ class MakeController extends Controller
 
     public function models(Make $make)
     {
-        return response()->json($make->models()->orderBy('name')->get());
+        $models = $make->models()->orderBy('name')->get();
+        $models->push((object)[
+            'id' => null,
+            'name' => 'غير ذلك',
+            'make_id' => $make->id
+        ]);
+        return response()->json($models);
     }
 
     public function addModel(Request $request, Make $make)

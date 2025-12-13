@@ -33,6 +33,18 @@ class CategoryFieldsController extends Controller
 
         $fields = $q->get();
 
+        // Append "غير ذلك" to options if not present
+        $fields->transform(function ($field) {
+            if (!empty($field->options) && is_array($field->options)) {
+                if (!in_array('غير ذلك', $field->options)) {
+                    $options = $field->options;
+                    $options[] = 'غير ذلك';
+                    $field->options = $options;
+                }
+            }
+            return $field;
+        });
+
         $governorates = Governorate::with('cities')->get();
 
         $section = $slug ? Section::fromSlug($slug) : null;
@@ -89,6 +101,10 @@ class CategoryFieldsController extends Controller
 
         if (empty($data['options'])) {
             $data['options'] = [];
+        } else {
+            if (!in_array('غير ذلك', $data['options'])) {
+                $data['options'][] = 'غير ذلك';
+            }
         }
 
         $field = CategoryField::create($data);
@@ -125,6 +141,10 @@ class CategoryFieldsController extends Controller
             }
 
             $data['options'] = array_values(array_unique($clean));
+            
+            if (!empty($data['options']) && !in_array('غير ذلك', $data['options'])) {
+                $data['options'][] = 'غير ذلك';
+            }
         }
 
         unset($data['field_name']);

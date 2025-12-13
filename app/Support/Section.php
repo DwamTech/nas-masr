@@ -26,6 +26,16 @@ final class Section
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get()
+            ->transform(function ($field) {
+                if (!empty($field->options) && is_array($field->options)) {
+                    if (!in_array('غير ذلك', $field->options)) {
+                        $options = $field->options;
+                        $options[] = 'غير ذلك';
+                        $field->options = $options;
+                    }
+                }
+                return $field;
+            })
             ->toArray();
 
         return new self(
@@ -51,6 +61,16 @@ final class Section
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get()
+            ->transform(function ($field) {
+                if (!empty($field->options) && is_array($field->options)) {
+                    if (!in_array('غير ذلك', $field->options)) {
+                        $options = $field->options;
+                        $options[] = 'غير ذلك';
+                        $field->options = $options;
+                    }
+                }
+                return $field;
+            })
             ->toArray();
 
         return new self(
@@ -186,7 +206,9 @@ final class Section
             if (!empty($f['options'])) {
                 $opts = is_array($f['options']) ? $f['options'] : json_decode($f['options'], true);
                 if (is_array($opts) && $opts) {
-                    $rules[] = 'in:' . implode(',', array_map(fn($v) => str_replace(',', '،', (string) $v), $opts));
+                    if (!in_array('غير ذلك', $opts)) {
+                        $rules[] = 'in:' . implode(',', array_map(fn($v) => str_replace(',', '،', (string) $v), $opts));
+                    }
                 }
             }
 

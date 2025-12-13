@@ -25,6 +25,7 @@ class SystemSettingController extends Controller
         'enable_global_external_notif',
         'free_ads_count',
         'free_ads_max_price',
+        'featured_user_max_ads',
         'jobs_default_image',
         'doctors_default_image',
         'teachers_default_image'
@@ -32,7 +33,7 @@ class SystemSettingController extends Controller
 
     // مفاتيح حسب النوع
     protected array $booleanKeys = ['show_phone','manual_approval','enable_global_external_notif'];
-    protected array $integerKeys = ['featured_users_count','free_ads_count','free_ads_max_price'];
+    protected array $integerKeys = ['featured_users_count','free_ads_count','free_ads_max_price','featured_user_max_ads'];
 
     protected function rules(): array
     {
@@ -53,6 +54,7 @@ class SystemSettingController extends Controller
             'enable_global_external_notif' => ['nullable', 'boolean'],
             'free_ads_count'        => ['nullable', 'integer', 'min:0'],
             'free_ads_max_price'    => ['nullable', 'integer', 'min:0'],
+            'featured_user_max_ads' => ['nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -67,6 +69,7 @@ class SystemSettingController extends Controller
     {
         if ($key === 'panner_image') return 'appearance';
         if (in_array($key, ['free_ads_count','free_ads_max_price'], true)) return 'ads';
+        if ($key === 'featured_user_max_ads') return 'home';
         return 'general';
     }
 

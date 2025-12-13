@@ -44,6 +44,14 @@ class CategorySectionsController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $mainSections->push((object)[
+            'id' => null,
+            'name' => 'غير ذلك',
+            'subSections' => [],
+            'sort_order' => 9999,
+            'category_id' => $category->id
+        ]);
+
         return response()->json([
             'category' => [
                 'id' => $category->id,
@@ -81,9 +89,14 @@ class CategorySectionsController extends Controller
 
     public function subSections(CategoryMainSection $mainSection)
     {
-        return response()->json(
-            $mainSection->subSections()->orderBy('sort_order')->get()
-        );
+        $subSections = $mainSection->subSections()->orderBy('sort_order')->get();
+        $subSections->push((object)[
+            'id' => null,
+            'name' => 'غير ذلك',
+            'main_section_id' => $mainSection->id,
+            'category_id' => $mainSection->category_id
+        ]);
+        return response()->json($subSections);
     }
     public function storeMain(Request $request, string $categorySlug)
     {

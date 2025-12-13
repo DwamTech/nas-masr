@@ -39,7 +39,12 @@ class BestAdvertiserController extends Controller
 
         $idsStr = implode(',', $userIds);
 
-        // Get 8 listings per user ordered by rank first
+        // Get max listings count from settings, default to 8
+        $maxListings = Cache::remember('settings:featured_user_max_ads', now()->addHours(6), function () {
+            return (int) (SystemSetting::where('key', 'featured_user_max_ads')->value('value') ?? 8);
+        });
+
+        // Get listings per user ordered by rank first
         $rows = DB::select("
         SELECT id, user_id
         FROM (
@@ -53,8 +58,8 @@ class BestAdvertiserController extends Controller
                 AND l.status = 'Valid'
                 AND l.user_id IN ($idsStr)
         ) t
-        WHERE rn <= 8
-    ", [(int)$categoryId]);
+        WHERE rn <= ?
+    ", [(int)$categoryId, $maxListings]);
 
         // Collect listing IDs so we can eager load them
         $listingIds = collect($rows)->pluck('id')->all();

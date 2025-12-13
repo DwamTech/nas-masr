@@ -208,6 +208,26 @@ class SystemSettingsSeeder extends Seeder
             ]
         );
 
+        // عدد الإعلانات التي تظهر لكل مستخدم مميز
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'featured_user_max_ads'],
+            [
+                'value'       => '8',
+                'type'        => 'integer',
+                'group'       => 'home',
+                'label'       => 'عدد الإعلانات الظاهرة لكل مستخدم مميز',
+                'meta'        => json_encode([
+                    'input' => 'number',
+                    'min'   => 1,
+                    'step'  => 1,
+                    'hint'  => 'يحدد عدد الإعلانات التي تظهر لكل مستخدم في قسم المعلنين المميزين'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
         // إظهار رقم الهاتف في الإعلانات
         DB::table('system_settings')->updateOrInsert(
             ['key' => 'show_phone'],
