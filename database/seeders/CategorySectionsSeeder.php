@@ -12,6 +12,11 @@ class CategorySectionsSeeder extends Seeder
     public function run(): void
     {
         $sections = [
+            
+            // قسم "غير ذلك" العام
+            'other' => [
+                 'أخرى' => ['غير ذلك']
+            ],
 
             // ===================== المتاجر والمولات =====================
             'stores' => [
@@ -727,22 +732,63 @@ class CategorySectionsSeeder extends Seeder
                     ]
                 );
 
-                $subSort = 1;
+                // إضافة "غير ذلك" للأقسام الفرعية
+                if (!in_array('غير ذلك', $subList)) {
+                    $subList[] = 'غير ذلك';
+                }
 
+                $subOrder = 1;
                 foreach ($subList as $subName) {
-                    CategorySubSection::updateOrCreate(
+                    CategorySubSection::firstOrCreate(
                         [
-                            'category_id' => $category->id,
+                            'category_id'     => $category->id,
                             'main_section_id' => $main->id,
-                            'name' => $subName,
+                            'name'            => $subName,
                         ],
                         [
-                            'sort_order' => $subSort++,
-                            'is_active' => true,
+                            'sort_order' => $subOrder++,
+                            'is_active'  => true,
                         ]
                     );
                 }
+
+                // إضافة "غير ذلك" كقسم فرعي لكل قسم رئيسي إذا لم يكن موجوداً
+                CategorySubSection::firstOrCreate(
+                    [
+                        'category_id'     => $category->id,
+                        'main_section_id' => $main->id,
+                        'name'            => 'غير ذلك',
+                    ],
+                    [
+                        'sort_order' => 9999,
+                        'is_active'  => true,
+                    ]
+                );
             }
+
+            // إضافة قسم رئيسي "غير ذلك" لكل قسم (Category)
+            $otherMain = CategoryMainSection::firstOrCreate(
+                [
+                    'category_id' => $category->id,
+                    'name'        => 'غير ذلك',
+                ],
+                [
+                    'sort_order' => 9999,
+                    'is_active'  => true,
+                ]
+            );
+            
+            CategorySubSection::firstOrCreate(
+                [
+                    'category_id'     => $category->id,
+                    'main_section_id' => $otherMain->id,
+                    'name'            => 'غير ذلك',
+                ],
+                [
+                    'sort_order' => 1,
+                    'is_active'  => true,
+                ]
+            );
         }
     }
 }

@@ -28,6 +28,12 @@ class GovernorateController extends Controller
 
         $gov = Governorate::create(['name' => $data['name']]);
 
+        // إضافة مدينة "غير ذلك" تلقائيًا
+        City::create([
+            'name' => 'غير ذلك',
+            'governorate_id' => $gov->id,
+        ]);
+
         return response()->json($gov->load('cities'), 201);
     }
     public function storCities(Request $request, Governorate $governorate)

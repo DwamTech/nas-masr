@@ -28,12 +28,18 @@ class CarMakesModelsSeeder extends Seeder
             'مرسيدس'    => ['C200', 'E200', 'GLC'],
         ];
 
+        // نضيف "غير ذلك" للماركات
+        $makes['غير ذلك'] = [];
+
         foreach ($makes as $makeName => $models) {
             $makeId = DB::table('makes')->insertGetId([
                 'name'       => $makeName,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            // إضافة "غير ذلك" للموديلات لكل ماركة
+            $models[] = 'غير ذلك';
 
             foreach ($models as $modelName) {
                 DB::table('models')->insert([

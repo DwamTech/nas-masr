@@ -119,6 +119,16 @@ class CategorySectionsController extends Controller
                 'sort_order'  => (CategoryMainSection::where('category_id', $category->id)->max('sort_order') ?? 0) + 1,
                 'is_active'   => true,
             ]);
+
+            // إضافة "غير ذلك" كقسم فرعي تلقائيًا
+            CategorySubSection::create([
+                'category_id'     => $category->id,
+                'main_section_id' => $main->id,
+                'name'            => 'غير ذلك',
+                'sort_order'      => 9999,
+                'is_active'       => true,
+            ]);
+
             $isNew = true;
         } else {
             return response()->json([

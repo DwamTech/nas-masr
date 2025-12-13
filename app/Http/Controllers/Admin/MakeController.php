@@ -38,6 +38,13 @@ class MakeController extends Controller
 
         if (!$make) {
             $make = Make::create(['name' => $data['name']]);
+            
+            // إضافة موديل "غير ذلك" تلقائيًا
+            CarModel::create([
+                'name' => 'غير ذلك',
+                'make_id' => $make->id,
+            ]);
+
             $isNew = true;
         } else {
             return response()->json([

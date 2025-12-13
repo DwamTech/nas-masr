@@ -60,15 +60,23 @@ class CitySeeder extends Seeder
                 'عتاقة',
                 'فيصل',
             ],
+            'غير ذلك' => [], // محافظة "غير ذلك"
         ];
 
         foreach ($govCities as $govName => $cityList) {
 
-            // لو المحافظة مش موجودة → نتخطاها، مش هنكررها
+            // لو المحافظة مش موجودة -> ننشئها إذا كانت "غير ذلك" أو نتخطاها
             $governorate = Governorate::where('name', $govName)->first();
             if (!$governorate) {
-                continue;
+                if ($govName === 'غير ذلك') {
+                    $governorate = Governorate::create(['name' => 'غير ذلك']);
+                } else {
+                    continue;
+                }
             }
+
+            // إضافة "غير ذلك" للمدن لكل محافظة
+            $cityList[] = 'غير ذلك';
 
             // علشان ميبقاش فيه تكرار — نعمل sync للمدن
             foreach ($cityList as $cityName) {
