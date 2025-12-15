@@ -19,6 +19,9 @@ class UserConversation extends Model
     /**
      * The attributes that are mass assignable.
      */
+    /**
+     * The attributes that are mass assignable.
+     */
     protected $fillable = [
         'conversation_id',
         'sender_id',
@@ -26,8 +29,11 @@ class UserConversation extends Model
         'receiver_id',
         'receiver_type',
         'message',
+        'attachment',
         'read_at',
-        'type',
+        'type',         // conversation type: peer, support
+        'content_type', // message content type: text, listing, image...
+        'listing_id',
     ];
 
     /**
@@ -37,6 +43,7 @@ class UserConversation extends Model
         'read_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'listing_id' => 'integer',
     ];
 
     /**
@@ -45,6 +52,16 @@ class UserConversation extends Model
     const TYPE_PEER = 'peer';           // محادثة بين عملاء
     const TYPE_SUPPORT = 'support';     // محادثة مع الدعم
     const TYPE_BROADCAST = 'broadcast'; // رسالة جماعية
+
+    /**
+     * Message Content Types.
+     */
+    const CONTENT_TYPE_TEXT = 'text';
+    const CONTENT_TYPE_LISTING = 'listing_inquiry';
+    const CONTENT_TYPE_IMAGE = 'image';
+    const CONTENT_TYPE_VIDEO = 'video';
+    const CONTENT_TYPE_AUDIO = 'audio';
+    const CONTENT_TYPE_FILE  = 'file';
 
     /*
     |--------------------------------------------------------------------------
@@ -58,6 +75,14 @@ class UserConversation extends Model
     public function sender(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Related Listing (optional).
+     */
+    public function listing(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Listing::class);
     }
 
     /**

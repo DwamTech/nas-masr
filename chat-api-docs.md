@@ -164,24 +164,49 @@ Authorization: Bearer {token}
 **🔵 إرسال رسالة لمستخدم:**
 ```http
 POST /api/chat/send
-Authorization: Bearer {token}
-Content-Type: application/json
+**Headers:**
+- `Authorization: Bearer <token>`
+- `Content-Type: multipart/form-data` (في حالة إرسال ملف)
+- `Accept: application/json`
 
+**Body Parameters (FormData):**
+
+| Parameter | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `receiver_id` | Integer | Yes | ID of the recipient user. |
+| `message` | String | No* | Required if type is 'text' or 'listing_inquiry'. Optional if sending a file. |
+| `file` | File | No* | Required if content_type is image/video/audio. |
+| `listing_id` | Integer | No | ID of the listing (for listing inquiries). |
+| `content_type` | String | No | `text`, `listing_inquiry`, `image`, `video`, `audio`, `file`. Default: `text`. |
+
+**Example Request (Text):**
+```json
 {
     "receiver_id": 10,
-    "message": "نص الرسالة"
+    "message": "Hello!",
+    "content_type": "text"
 }
 ```
 
-**Response:**
+**Example Request (Image with Caption):**
+```bash
+receiver_id: 10
+message: "صورة للمنتج"
+content_type: "image"
+file: (binary_image_data)
+```
+
+**Example Response:**
 ```json
 {
     "message": "تم إرسال الرسالة بنجاح",
     "data": {
-        "id": 50,
-        "conversation_id": "uuid",
-        "message": "نص الرسالة",
-        "created_at": "2025-12-10T10:30:00Z"
+        "id": 125,
+        "conversation_id": "peer:10:5",
+        "message": "صورة للمنتج",
+        "attachment": "https://domain.com/storage/chat/2025/12/images/xyz.jpg",
+        "content_type": "image",
+        "created_at": "2025-12-14T23:30:00.000000Z"
     }
 }
 ```
@@ -204,6 +229,42 @@ Authorization: Bearer {token}
 
 ---
 
+## 🏷️ بطاقة ملخص الإعلان (Listing Card)
+
+تستخدم لعرض تفاصيل مختصرة عن الإعلان داخل المحادثة لتوضيح السياق.
+
+**🔵 جلب ملخص الإعلان للمحادثة:**
+```http
+GET /api/chat/listing-summary/{category_slug}/{listing_id}
+Authorization: Bearer {token}
+```
+
+**مثال:** `GET /api/chat/listing-summary/cars/456`
+
+**Response:**
+```json
+{
+    "success": true,
+    "data": {
+        "type": "listing_card",
+        "listing_id": 456,
+        "category_slug": "cars",
+        "category_name": "سيارات للبيع",
+        "title": "سيارة BMW 2020",
+        "price": 550000.00,
+        "currency": "ج.م",
+        "price_formatted": "550,000 ج.م",
+        "main_image_url": "https://example.com/storage/...",
+        "governorate": "القاهرة",
+        "city": "مدينة نصر",
+        "status": "Valid",
+        "published_at": "2025-12-14T10:00:00Z"
+    }
+}
+```
+
+---
+
 ## 📋 ملخص سريع
 
 | الـ Tab | الوظيفة | الـ Endpoint |
@@ -214,5 +275,6 @@ Authorization: Bearer {token}
 | محادثات العملاء | فتح محادثة | `GET /api/chat/{user_id}` |
 | محادثات العملاء | إرسال رسالة | `POST /api/chat/send` |
 | عام | عدد غير المقروء | `GET /api/chat/unread-count` |
+| عام | ملخص الإعلان | `GET /api/chat/listing-summary/{slug}/{id}` |
 
 > **ملاحظة:** كل الـ endpoints تحتاج `Authorization: Bearer {token}` في الـ Header.

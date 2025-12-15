@@ -101,7 +101,10 @@ class ChatService
         User $sender,
         ?User $receiver,
         string $message,
-        string $type = UserConversation::TYPE_PEER
+        string $type = UserConversation::TYPE_PEER,
+        ?int $listingId = null,
+        string $contentType = UserConversation::CONTENT_TYPE_TEXT,
+        ?string $attachment = null
     ): UserConversation {
         $conversationId = $this->getConversationId($sender, $receiver, $type);
 
@@ -112,7 +115,10 @@ class ChatService
             'receiver_id' => $receiver?->id,
             'receiver_type' => $receiver ? User::class : null,
             'message' => $message,
+            'attachment' => $attachment,
             'type' => $type,
+            'listing_id' => $listingId,
+            'content_type' => $contentType,
         ]);
 
         // Dispatch real-time event
@@ -163,7 +169,7 @@ class ChatService
     public function getHistory(string $conversationId, int $perPage = 50): LengthAwarePaginator
     {
         return UserConversation::inConversation($conversationId)
-            ->with(['sender', 'receiver'])
+            ->with(['sender', 'receiver', 'listing'])
             ->orderBy('created_at', 'asc')
             ->paginate($perPage);
     }
@@ -225,7 +231,9 @@ class ChatService
             return [
                 'conversation_id' => $message->conversation_id,
                 'type' => $message->type,
+                'content_type' => $message->content_type,
                 'last_message' => $message->message,
+                'attachment' => $message->attachment ? asset('storage/' . $message->attachment) : null,
                 'last_message_at' => $message->created_at,
                 'is_read' => $isRead,
                 'other_party' => $otherParty ? [

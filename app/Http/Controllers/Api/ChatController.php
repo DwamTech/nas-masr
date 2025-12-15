@@ -27,7 +27,9 @@ class ChatController extends Controller
     {
         $sender = $request->user();
         $receiver = User::findOrFail($request->validated('receiver_id'));
-        $message = $request->validated('message');
+        $messageContent = $request->validated('message');
+        $listingId = $request->validated('listing_id');
+        $contentType = $request->validated('content_type') ?? UserConversation::CONTENT_TYPE_TEXT;
 
         // Prevent sending message to self
         if ($sender->id === $receiver->id) {
@@ -36,37 +38,90 @@ class ChatController extends Controller
             ], 422);
         }
 
-        $conversation = $this->chatService->sendMessage(
-            $sender,
-            $receiver,
-            $message,
-            UserConversation::TYPE_PEER
-        );
+        $attachmentPath = null;
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $datePath = now()->format('Y/m');
+            // Determine folder based on content type (image, video, etc.)
+            $folder = in_array($contentType, ['image', 'video', 'audio']) ? $contentType . 's' : 'files';
+            $dir = "chat/{$datePath}/{$folder}";
+            
+            try {
+                // Ensure directory exists
+                \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory($dir);
+                
+                $name = \Illuminate\Support\Str::uuid()->toString() . '.' . $file->getClientOriginalExtension();
+                $attachmentPath = $file->storeAs($dir, $name, 'public');
+                
+                if (!$attachmentPath) {
+                    throw new \Exception("File upload returned false");
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('chat_upload_failed', ['error' => $e->getMessage(), 'user_id' => $sender->id]);
+                return response()->json(['message' => 'فشل رفع الملف، يرجى المحاولة مرة أخرى'], 500);
+            }
+        }
 
-        // Check cooldown for notification (10 minutes)
+        try {
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($sender, $receiver, $messageContent, $listingId, $contentType, $attachmentPath) {
+                // Determine the message text to save
+                // If text/listing -> use message content
+                // If media -> message content is optional caption
+                $savedMessage = $messageContent;
+
+                /** @var UserConversation $conversation */
+                $conversation = $this->chatService->sendMessage(
+                    $sender,
+                    $receiver,
+                    $savedMessage,
+                    UserConversation::TYPE_PEER,
+                    $listingId,
+                    $contentType,
+                    $attachmentPath // Pass attachment path
+                );
+
+                // Dispatch notification (Logic separated to avoid transaction coupling if using queues, but here it's sync check)
+                // We'll move notification dispatch OUTSIDE transaction if possible, or keep it if light.
+                // Keeping it inside for now as per original code structure, but simplified.
+                $this->notifyReceiver($sender, $receiver, $conversation);
+
+                return response()->json([
+                    'message' => 'تم إرسال الرسالة بنجاح',
+                    'data' => [
+                        'id' => $conversation->id,
+                        'conversation_id' => $conversation->conversation_id,
+                        'message' => $conversation->message,
+                        'attachment' => $conversation->attachment ? asset('storage/' . $conversation->attachment) : null,
+                        'content_type' => $conversation->content_type,
+                        'created_at' => $conversation->created_at,
+                    ],
+                ], 201);
+            });
+        } catch (\Throwable $e) {
+            // Cleanup uploaded file if DB transaction fails
+            if ($attachmentPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($attachmentPath)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($attachmentPath);
+            }
+            \Illuminate\Support\Facades\Log::error('chat_send_transaction_failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'حدث خطأ أثناء إرسال الرسالة'], 500);
+        }
+    }
+
+    private function notifyReceiver($sender, $receiver, $conversation) 
+    {
         $cacheKey = "chat_notif_cooldown:{$sender->id}:{$receiver->id}";
         if (!Cache::has($cacheKey)) {
+            $msgPreview = $conversation->content_type === 'text' ? "لديك رسالة جديدة من {$sender->name}" : "أرسل لك {$sender->name} مرفقاً";
+            
             $this->notificationService->dispatch(
                 $receiver->id,
                 'رسالة جديدة',
-                "لديك رسالة جديدة من {$sender->name}",
+                $msgPreview,
                 'new_message',
                 ['conversation_id' => $conversation->conversation_id, 'sender_id' => $sender->id]
             );
-            
-            // Set cooldown for 10 minutes
             Cache::put($cacheKey, true, now()->addMinutes(10));
         }
-
-        return response()->json([
-            'message' => 'تم إرسال الرسالة بنجاح',
-            'data' => [
-                'id' => $conversation->id,
-                'conversation_id' => $conversation->conversation_id,
-                'message' => $conversation->message,
-                'created_at' => $conversation->created_at,
-            ],
-        ], 201);
     }
 
     /**
@@ -241,6 +296,76 @@ class ChatController extends Controller
 
         return response()->json([
             'unread_count' => $this->chatService->getTotalUnreadCount($user),
+        ]);
+    }
+
+    /**
+     * Get compact listing summary for chat display.
+     * GET /api/chat/listing-summary/{category_slug}/{listing_id}
+     * 
+     * Returns minimal listing data to display as a card in chat.
+     */
+    public function getListingSummary(Request $request, string $categorySlug, int $listingId): JsonResponse
+    {
+        $sec = \App\Support\Section::fromSlug($categorySlug);
+        
+        $listing = \App\Models\Listing::query()
+            ->where('id', $listingId)
+            ->where('category_id', $sec->id())
+            ->with(['governorate', 'city', 'attributes'])
+            ->first();
+
+        if (!$listing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'الإعلان غير موجود',
+            ], 404);
+        }
+
+        // Get default image for categories that use default images
+        $mainImageUrl = null;
+        if (in_array($categorySlug, ['jobs', 'doctors', 'teachers'])) {
+            $defPath = \Illuminate\Support\Facades\Cache::remember(
+                "settings:{$categorySlug}_default_image",
+                now()->addHours(6),
+                fn() => \App\Models\SystemSetting::where('key', "{$categorySlug}_default_image")->value('value')
+            );
+            $mainImageUrl = $defPath ? asset('storage/' . $defPath) : null;
+        } else {
+            $mainImageUrl = $listing->main_image ? asset('storage/' . $listing->main_image) : null;
+        }
+
+        // Get title preference: Database column > Attribute > Description
+        $title = $listing->title;
+        if (!$title && $listing->relationLoaded('attributes')) {
+            foreach ($listing->attributes as $attr) {
+                if (in_array($attr->key, ['title', 'name', 'job_title'])) {
+                    $title = $attr->value_string;
+                    break;
+                }
+            }
+        }
+        if (!$title && $listing->description) {
+            $title = \Illuminate\Support\Str::limit($listing->description, 50);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'type' => 'listing_card',
+                'listing_id' => $listing->id,
+                'category_slug' => $categorySlug,
+                'category_name' => $sec->name,
+                'title' => $title,
+                'price' => $listing->price,
+                'currency' => $listing->currency ?? 'ج.م',
+                'price_formatted' => number_format($listing->price) . ' ' . ($listing->currency ?? 'ج.م'),
+                'main_image_url' => $mainImageUrl,
+                'governorate' => $listing->governorate?->name,
+                'city' => $listing->city?->name,
+                'status' => $listing->status,
+                'published_at' => $listing->published_at,
+            ],
         ]);
     }
 }

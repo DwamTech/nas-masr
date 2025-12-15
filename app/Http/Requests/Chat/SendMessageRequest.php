@@ -23,7 +23,49 @@ class SendMessageRequest extends FormRequest
     {
         return [
             'receiver_id' => ['required', 'integer', 'exists:users,id'],
-            'message' => ['required', 'string', 'min:1', 'max:5000'],
+            'listing_id' => ['nullable', 'integer', 'exists:listings,id'],
+            'content_type' => ['nullable', 'string', 'in:text,listing_inquiry,image,video,audio,file'],
+            
+            // Message validation: required if text or listing, optional if uploading file
+            'message' => [
+                'nullable', 
+                'string', 
+                'max:5000', 
+                function ($attribute, $value, $fail) {
+                    $type = $this->input('content_type', 'text');
+                    $hasFile = $this->hasFile('file');
+                    
+                    if (($type === 'text' || $type === 'listing_inquiry') && empty($value)) {
+                        $fail('يجب كتابة رسالة.');
+                    }
+                    if (!$hasFile && empty($value)) {
+                        $fail('يجب كتابة رسالة أو إرفاق ملف.');
+                    }
+                },
+            ],
+
+            // File validation based on content_type
+            'file' => [
+                'nullable',
+                'file',
+                function ($attribute, $value, $fail) {
+                    $type = $this->input('content_type');
+                    // If content_type indicates media, file is required
+                    if (in_array($type, ['image', 'video', 'audio', 'file']) && !$value) {
+                         $fail('يجب إرفاق ملف لهذا النوع من الرسائل.');
+                    }
+                },
+                // Image validation
+                'required_if:content_type,image', 
+                'mimes:jpeg,png,jpg,gif,webp,svg', 
+                'max:5120', // 5MB
+
+                // Video validation (handled manually or via rule separation? better to use closure or generic mimes if type is mixed, but here we can rely on general checks or strictly content_type)
+                // Since 'file' applies to all, we can't easily split max size per type in standard rules without complex conditional logic.
+                // Simplified approach: Allow reasonable max for all, check mimes.
+                
+                // Let's rely on flexible mimes but strict checking
+            ],
         ];
     }
 
@@ -38,6 +80,10 @@ class SendMessageRequest extends FormRequest
             'message.required' => 'يجب كتابة رسالة',
             'message.min' => 'الرسالة قصيرة جداً',
             'message.max' => 'الرسالة طويلة جداً (الحد الأقصى 5000 حرف)',
+            'file.max' => 'حجم الملف كبير جداً (يجب أن يكون أقل من 5 ميجابايت للصور)',
+            'file.mimes' => 'نوع الملف غير مدعوم',
+            'file.required_if' => 'يجب اختيار ملف للرفع',
+            'content_type.in' => 'نوع الرسالة غير صالح',
         ];
     }
 }

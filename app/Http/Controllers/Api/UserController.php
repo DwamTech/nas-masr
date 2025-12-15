@@ -122,7 +122,7 @@ class UserController extends Controller
             ->orderBy('rank', 'desc')
             ->orderBy('published_at', 'desc')
             ->orderBy('id', 'desc')
-            ->with(['attributes', 'governorate', 'city', 'make', 'model']);
+            ->with(['attributes', 'governorate', 'city', 'make', 'model', 'mainSection', 'subSection']);
 
         if ($categoryId) {
             $q->where('category_id', $categoryId);

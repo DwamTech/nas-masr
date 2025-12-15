@@ -565,7 +565,7 @@ class ListingController extends Controller
                     ' تمت مشاهدة إعلانك',
                     'قام المستخدم #' . $viewer->id . ' بمشاهدة إعلانك #' . $listing->id . ' في قسم ' . $sec->name,
                     'view',
-                    ['viewer_id' => (int) $viewer->id, 'listing_id' => (int) $listing->id]
+                    ['viewer_id' => (int) $viewer->id, 'listing_id' => (int) $listing->id, 'category_slug' => $sec->slug]
                 );
             }
         }

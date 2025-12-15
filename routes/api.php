@@ -268,6 +268,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/send', [ChatController::class, 'send']);
         Route::get('/support', [ChatController::class, 'supportHistory']);
         Route::post('/support', [ChatController::class, 'sendToSupport']);
+        Route::get('/listing-summary/{categorySlug}/{listingId}', [ChatController::class, 'getListingSummary']);
         Route::get('/{user}', [ChatController::class, 'history']);
         Route::patch('/{conversationId}/read', [ChatController::class, 'markAsRead']);
     });
