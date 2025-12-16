@@ -41,6 +41,11 @@ class CategoryRequest extends FormRequest
                 'string',
                 'max:150',
             ],
+            'default_image' => [
+                $isUpdate ? 'sometimes' : 'nullable',
+                'image',
+                'max:4096', // 4MB
+            ],
             'is_active' => [
                 $isUpdate ? 'sometimes' : 'nullable',
                 'boolean',

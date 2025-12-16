@@ -20,6 +20,7 @@ class CategoryPlanPrice extends Model
         'standard_ad_price',   
         'standard_days',
         'standard_ads_count',       
+        'free_ad_max_price',
     ];
 
     public function category()

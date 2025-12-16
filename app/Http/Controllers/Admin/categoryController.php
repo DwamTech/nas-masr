@@ -34,7 +34,13 @@ class categoryController extends Controller
     // POST /api/admin/categories
     public function store(categoryRequest $request)
     {
-        $cat = Category::create($request->validated());
+        $data = $request->validated();
+        if ($request->hasFile('default_image')) {
+            $path = $request->file('default_image')->store('categories', 'uploads');
+            $data['default_image'] = basename($path);
+        }
+
+        $cat = Category::create($data);
 
         return response()->json([
             'message' => 'تم إنشاء القسم بنجاح',
@@ -45,8 +51,18 @@ class categoryController extends Controller
     // PUT /api/admin/categories/{category}
     public function update(CategoryRequest $request, Category $category)
     {
+        $data = $request->validated();
 
-        $category->update($request->validated());
+        if ($request->boolean('remove_default_image')) {
+            $data['default_image'] = null;
+        }
+
+        if ($request->hasFile('default_image')) {
+            $path = $request->file('default_image')->store('categories', 'uploads');
+            $data['default_image'] = basename($path);
+        }
+
+        $category->update($data);
 
         return response()->json([
             'message' => 'تم تحديث القسم بنجاح',

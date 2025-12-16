@@ -235,6 +235,7 @@ class ListingController extends Controller
         $user = $request->user();
         $sec = Section::fromSlug($section);
         $data = $request->validated();
+        $isAdmin = $this->userIsAdmin($user);
 
         $rank = $this->getNextRank(Listing::class, $sec->id());
         $data['rank'] = $rank;
@@ -277,26 +278,17 @@ class ListingController extends Controller
                 ->first();
 
             if ($activeSub) {
-                // [MODIFIED] Check & Consume Ad
-                if (!$activeSub->consumeAd(1)) {
-                    $paymentRequired = true; // Fallback to payment if ads are exhausted
-                    // If you want to strictly block, return here. 
-                    // But maybe user wants to pay for this specific ad?
-                    // Let's assume we want to block "Subscription usage" but allow "Paying per ad".
-                    // However, original logic falls through to check other methods? No, it's an if-else block.
-
-                    // Logic: If subscription exists but no ads, user must renew or pay per ad.
-                    // We will set $activeSub to null to force falling into "else" block (Package or Pay per ad)?
-                    // Or we explicitly return error?
-                    // Based on req: "Block if 0".
-
-                    $activeSub = null; // Treat as if no active subscription for this flow
-                    // We continue to the 'else' block which checks for Packages or forces Payment.
-                    // But wait, the 'else' block checks for Packages.
-                    // If we want to allow paying for this ad individually, we just let it fall through.
-                    // If we want to tell them "Your subscription is empty", we might need a specific message.
-
-                    // Let's rely on standard flow: if sub is empty, it's not "active" for this purpose.
+                // If subscription exists, try to consume
+                 if (!$activeSub->consumeAd(1)) {
+                    // Subscription empty
+                    if ($isAdmin) {
+                         // Admin Bypass for Empty Subscription
+                         $paymentRequired = false;
+                         $activeSub = null; // Treat as no sub, fall to manual calc below
+                    } else {
+                        $paymentRequired = true;
+                         $activeSub = null;
+                    }
                 } else {
                     $data['expire_at'] = $activeSub->expires_at;
                     $paymentType = 'subscription';
@@ -305,13 +297,34 @@ class ListingController extends Controller
                     $priceOut = (float) ($activeSub->price ?? 0);
                     $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
                 }
-            } else {
+            }
+            
+            // If checking subscription failed or didn't exist
+            if (!$activeSub && !$paymentType) {
                 $packageResult = $this->consumeForPlan($user->id, $planNorm);
                 $packageData   = $packageResult->getData(true);
 
                 if (empty($packageData['success']) || $packageData['success'] === false) {
-                    $paymentRequired = true;
-                    $message = ' لا تملك باقة فعّالة، يجب عليك دفع قيمة هذا الإعلان.او الاشتراك في باقه';
+                     if ($isAdmin) {
+                        // ADMIN SUPER BYPASS: No Package/Sub needed
+                        $paymentRequired = false;
+                        
+                        // Calculate Expiration based on Category Rules
+                        $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
+                        $days = $planNorm === 'featured'
+                            ? ((int)($prices?->featured_days ?? 30))
+                            : ((int)($prices?->standard_days ?? 30));
+
+                         if ($days <= 0) $days = 30; // Fallback
+
+                        $data['expire_at'] = now()->addDays($days);
+                        $paymentType = 'admin_bypass';
+                        $priceOut = 0.0;
+                         $data['publish_via'] = 'admin'; // Or package to simulate
+                     } else {
+                        $paymentRequired = true;
+                        $message = ' لا تملك باقة فعّالة، يجب عليك دفع قيمة هذا الإعلان.او الاشتراك في باقه';
+                     }
                 } else {
                     $data['expire_at'] = Carbon::parse($packageData['expire_date']);
                     $paymentType = 'package';
@@ -344,7 +357,7 @@ class ListingController extends Controller
                 $overCount = ($freeCount > 0 && $userFreeCount >= $freeCount);
                 $overPrice = ($freeMaxPrice > 0 && $priceVal > $freeMaxPrice);
 
-                if ($overCount || $overPrice) {
+                if (($overCount || $overPrice) && !$isAdmin) {
                     // $paymentRequired = true;
 
                     $message = null;
@@ -367,11 +380,12 @@ class ListingController extends Controller
                         ], 402);
                     }
                 }
-            } else {
-                $data['publish_via'] = $freeVia;
-                $paymentType = 'free';
-                $priceOut = 0.0;
-            }
+            } 
+            
+            // Standard free flow (or Admin Bypass passes through here)
+            $data['publish_via'] = $freeVia;
+            $paymentType = 'free';
+            $priceOut = 0.0;
         }
 
 
@@ -380,7 +394,7 @@ class ListingController extends Controller
             $data['status'] = 'Pending';
             $data['admin_approved'] = false;
         } else {
-            if ($manualApprove) {
+            if ($manualApprove && !$isAdmin) { // Admins bypass manual approval too? Assume yes
                 $data['status'] = 'Pending';
                 $data['admin_approved'] = false;
             } else {
@@ -399,9 +413,12 @@ class ListingController extends Controller
         }
 
         $listing = $service->create($sec, $data, $user->id);
-
-        $user->role = 'advertiser';
-        $user->save();
+        
+        // Only change role if not admin (don't downgrade admin to advertiser)
+        if ($user->role !== 'admin') {
+            $user->role = 'advertiser';
+            $user->save();
+        }
 
         if ($paymentRequired) {
             return response()->json([

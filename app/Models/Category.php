@@ -10,6 +10,7 @@ class Category extends Model
         'slug',
         'name',
         'icon',
+        'default_image',
         'sort_order',
         'is_active',
     ];
@@ -17,7 +18,7 @@ class Category extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
-    protected $appends = ['icon_url'];
+    protected $appends = ['icon_url', 'default_image_url'];
 
     public function getIconUrlAttribute(): ?string
     {
@@ -26,6 +27,15 @@ class Category extends Model
         }
 
         return asset('storage/uploads/categories/' . $this->icon);
+    }
+
+    public function getDefaultImageUrlAttribute(): ?string
+    {
+        if (!$this->default_image) {
+            return null;
+        }
+
+        return asset('storage/uploads/categories/' . $this->default_image);
     }
     public function planPrice()
     {

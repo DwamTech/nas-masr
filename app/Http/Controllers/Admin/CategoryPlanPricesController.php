@@ -56,6 +56,7 @@ class CategoryPlanPricesController extends Controller
             'items.*.standard_ad_price'       => ['required', 'numeric', 'min:0'],
             'items.*.standard_days'           => ['required', 'integer', 'min:0'],
             'items.*.standard_ads_count'      => ['required', 'integer', 'min:0'],
+            'items.*.free_ad_max_price'       => ['nullable', 'numeric', 'min:0'],
         ]);
 
         foreach ($data['items'] as $row) {
@@ -71,6 +72,8 @@ class CategoryPlanPricesController extends Controller
                     'standard_ad_price' => $row['standard_ad_price'] ?? 0,
                     'standard_days'     => $row['standard_days']     ?? 0,
                     'standard_ads_count'=> $row['standard_ads_count']?? 0,
+                    
+                    'free_ad_max_price' => $row['free_ad_max_price'] ?? 0,
                 ]
             );
         }
