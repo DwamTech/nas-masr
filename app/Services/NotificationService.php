@@ -6,6 +6,7 @@ use App\Models\Notification;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
@@ -13,6 +14,13 @@ class NotificationService
      * Cooldown period in seconds for duplicate notifications
      */
     private const COOLDOWN_SECONDS = 120; // 2 minutes
+
+    protected $firebase;
+
+    public function __construct(FirebaseService $firebase)
+    {
+        $this->firebase = $firebase;
+    }
 
     public function dispatch(int $userId, string $title, string $body, ?string $type = null, ?array $data = null): array
     {
@@ -77,6 +85,16 @@ class NotificationService
 
     protected function sendExternal(User $user, array $payload): bool
     {
-        return true;
+        if (!$user->fcm_token) {
+            Log::info('User has no FCM token', ['user_id' => $user->id]);
+            return false;
+        }
+
+        return $this->firebase->sendToUser(
+            $user->fcm_token,
+            $payload['title'],
+            $payload['body'],
+            $payload['data'] ?? null
+        );
     }
 }

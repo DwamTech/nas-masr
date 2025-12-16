@@ -832,4 +832,38 @@ class UserController extends Controller
             'paid_at' => $paidAt->toIso8601String(),
         ]);
     }
+    
+    /**
+     * حفظ/تحديث FCM Token للمستخدم
+     * POST /api/fcm-token
+     */
+    public function updateFcmToken(Request $request)
+    {
+        $data = $request->validate([
+            'fcm_token' => ['required', 'string', 'max:255'],
+        ]);
+
+        $user = $request->user();
+        $user->fcm_token = $data['fcm_token'];
+        $user->save();
+
+        return response()->json([
+            'message' => 'FCM token updated successfully',
+        ]);
+    }
+
+    /**
+     * حذف FCM Token (عند تسجيل الخروج)
+     * DELETE /api/fcm-token
+     */
+    public function deleteFcmToken(Request $request)
+    {
+        $user = $request->user();
+        $user->fcm_token = null;
+        $user->save();
+
+        return response()->json([
+            'message' => 'FCM token deleted successfully',
+        ]);
+    }
 }

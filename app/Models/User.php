@@ -39,7 +39,9 @@ class User extends Authenticatable
         'otp',
         'otp_verified_at',
         'role',
+        'fcm_token',
     ];
+
 
     /**
      * The attributes that should be hidden for serialization.

@@ -249,6 +249,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/favorites', [FavoriteController::class, 'index']);
     Route::post('/favorite', [FavoriteController::class, 'toggle']);
 
+    // FCM Token Management
+    Route::post('/fcm-token', [UserController::class, 'updateFcmToken']);
+    Route::delete('/fcm-token', [UserController::class, 'deleteFcmToken']);
+
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/status', [NotificationController::class, 'status']);
     Route::post('/notifications', [NotificationController::class, 'store'])->middleware('admin');
