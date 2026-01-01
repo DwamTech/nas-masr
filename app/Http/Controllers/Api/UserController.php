@@ -694,9 +694,10 @@ class UserController extends Controller
                 'message' => 'You are already a representative',
                 'user_code' => (string) $user->id,
                 'role' => $user->role,
-                // Backward compatibility - old structure (formatted)
+                // Backward compatibility - old structure
+                // IMPORTANT: id = user_id (not user_clients.id) for app compatibility
                 'data' => [
-                    'id' => $userClient->id,
+                    'id' => (int) $user->id,  // ← Same as user_id for app compatibility
                     'user_id' => (int) $user->id,
                     'clients' => $userClient->clients ?? [],
                     'created_at' => $userClient->created_at,
@@ -713,9 +714,10 @@ class UserController extends Controller
             'message' => 'You are now a representative. Your delegate code is: ' . $user->id,
             'user_code' => (string) $user->id,
             'role' => $user->role,
-            // Backward compatibility - old structure (formatted)
+            // Backward compatibility - old structure
+            // IMPORTANT: id = user_id (not user_clients.id) for app compatibility
             'data' => [
-                'id' => $userClient->id,
+                'id' => (int) $user->id,  // ← Same as user_id for app compatibility
                 'user_id' => (int) $user->id,
                 'clients' => $userClient->clients ?? [],
                 'created_at' => $userClient->created_at,
