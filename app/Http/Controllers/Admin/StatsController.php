@@ -419,11 +419,15 @@ class StatsController extends Controller
                     $expireTs = $pkg->standard_expire_date;  // null means unlimited
                 }
             } else {
-                $days = 365;
+                $days = Cache::remember('settings:free_ad_days_validity', now()->addHours(6), function () {
+                    return (int)(SystemSetting::where('key', 'free_ad_days_validity')->value('value') ?? 365);
+                });
                 $expireTs = now()->copy()->addDays($days);
             }
         } else {
-            $days = 365;
+            $days = Cache::remember('settings:free_ad_days_validity', now()->addHours(6), function () {
+                return (int)(SystemSetting::where('key', 'free_ad_days_validity')->value('value') ?? 365);
+            });
             $expireTs = now()->copy()->addDays($days);
         }
 

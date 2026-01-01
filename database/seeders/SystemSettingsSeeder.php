@@ -325,5 +325,25 @@ class SystemSettingsSeeder extends Seeder
                 'updated_at'  => $now,
             ]
         );
+
+        // عدد أيام صلاحية الإعلان المجاني
+        DB::table('system_settings')->updateOrInsert(
+            ['key' => 'free_ad_days_validity'],
+            [
+                'value'       => '365', // افتراضي 365 يوم
+                'type'        => 'integer',
+                'group'       => 'ads',
+                'label'       => 'عدد أيام صلاحية الإعلان المجاني',
+                'meta'        => json_encode([
+                    'input' => 'number',
+                    'min'   => 1,
+                    'step'  => 1,
+                    'hint'  => 'يحدد مدة بقاء الإعلان المجاني منشوراً قبل انتهاء صلاحيته'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
     }
 }
