@@ -69,27 +69,40 @@ class UserController extends Controller
         ]);
 
         if (!empty($validated['referral_code'])) {
-            $code = UserClient::where('user_id', $validated['referral_code'])->first();
-            if (!$code) {
+            // Don't allow changing referral_code if already set
+            if (!empty($user->referral_code) && $user->referral_code !== $validated['referral_code']) {
                 return response([
-                    'message' => 'Referral code not found'
+                    'message' => 'You cannot change your delegate code once it has been set.'
+                ], 422);
+            }
+
+            // Check if referral_code is a valid user ID who is a representative
+            $delegateUser = User::where('id', $validated['referral_code'])
+                ->where('role', 'representative')
+                ->first();
+
+            if (!$delegateUser) {
+                return response([
+                    'message' => 'Invalid delegate code. Please check the code and try again.'
                 ], 404);
             }
-            $clients = $code->clients ?? [];
 
+            // Add user to delegate's clients list
+            $userClient = UserClient::firstOrCreate(
+                ['user_id' => $validated['referral_code']],
+                ['clients' => []]
+            );
 
-            if (in_array($user->id, $clients)) {
-                return response()->json([
-                    "message" => "You have already used this referral code."
-                ]);
+            $clients = $userClient->clients ?? [];
+
+            // Check if user is already in the list
+            if (!in_array($user->id, $clients)) {
+                $clients[] = $user->id;
+                $userClient->clients = $clients;
+                $userClient->save();
             }
-
-            $clients[] = $user->id;
-
-
-            $code->clients = $clients;
-            $code->save();
         }
+
         $user->update($validated);
 
         return response([
@@ -662,50 +675,88 @@ class UserController extends Controller
     }
 
 
-    //create agent code
+    //create agent code (make user a representative)
 
     public function storeAgent(Request $request)
     {
-        $user = request()->user();
+        $user = $request->user();
 
-        // Check if user already has an agent code
-        $code = \App\Models\UserClient::where('user_id', $user->id)->first();
+        // Create or retrieve user_clients record
+        $userClient = \App\Models\UserClient::firstOrCreate(
+            ['user_id' => $user->id],
+            ['clients' => []]
+        );
 
-        if ($code) {
-            // Restore role if needed (optional safety)
-            if ($user->role !== 'representative') {
-                $user->role = 'representative';
-                $user->save();
-            }
-
+        // Check if user already is a representative
+        if ($user->role === 'representative') {
             return response()->json([
-                'message' => 'Agent code retrieved successfully',
-                'data' => $code
+                'message' => 'You are already a representative',
+                'user_code' => (string) $user->id,
+                'role' => $user->role,
+                // Backward compatibility - old structure
+                'data' => $userClient
             ]);
         }
 
-        $code = \App\Models\UserClient::create([
-            'user_id' => $user->id,
-            // 'client_code'=>strtoupper(Str::random(10)),
-        ]);
-        
+        // Update user role to representative
         $user->role = 'representative';
         $user->save();
 
         return response()->json([
-            'message' => 'Agent code created successfully',
-            'data' => $code
+            'message' => 'You are now a representative. Your delegate code is: ' . $user->id,
+            'user_code' => (string) $user->id,
+            'role' => $user->role,
+            // Backward compatibility - old structure
+            'data' => $userClient->fresh()
         ]);
     }
 
-    //get clients 
+    //get clients for representative
     public function allClients(Request $request)
     {
         $user = $request->user();
-        $Client = UserClient::where('user_id', $user->id)->with('user')->get();
+
+        // Check if user is a representative
+        if ($user->role !== 'representative') {
+            return response()->json([
+                'message' => 'Only representatives can view their clients',
+                'data' => []
+            ], 403);
+        }
+
+        $userClient = UserClient::where('user_id', $user->id)->first();
+
+        if (!$userClient || empty($userClient->clients)) {
+            return response()->json([
+                'message' => 'No clients found',
+                'user_code' => (string) $user->id,
+                'clients_count' => 0,
+                'data' => []
+            ]);
+        }
+
+        // Get all client users
+        $clients = User::whereIn('id', $userClient->clients)
+            ->withCount('listings')
+            ->get()
+            ->map(function ($client) {
+                return [
+                    'id' => $client->id,
+                    'name' => $client->name,
+                    'phone' => $client->phone,
+                    'user_code' => (string) $client->id,
+                    'role' => $client->role,
+                    'status' => $client->status ?? 'active',
+                    'registered_at' => optional($client->created_at)->toDateString(),
+                    'listings_count' => $client->listings_count ?? 0,
+                ];
+            });
+
         return response()->json([
             'message' => 'Clients retrieved successfully',
-            'data' => $Client
+            'user_code' => (string) $user->id,
+            'clients_count' => $clients->count(),
+            'data' => $clients
         ]);
     }
 

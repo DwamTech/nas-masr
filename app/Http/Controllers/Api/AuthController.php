@@ -54,11 +54,14 @@ class AuthController extends Controller
             }
 
             if (!empty($data['referral_code'])) {
+                // Check if referral_code is a valid user ID who is a representative
+                $delegateUser = User::where('id', $data['referral_code'])
+                    ->where('role', 'representative')
+                    ->first();
 
-                $code = UserClient::where('user_id', $data['referral_code'])->first();
-                if (!$code) {
+                if (!$delegateUser) {
                     return response([
-                        'message' => 'Referral code not found'
+                        'message' => 'Invalid delegate code. Please check the code and try again.'
                     ], 404);
                 }
             }
@@ -71,21 +74,22 @@ class AuthController extends Controller
                 'country_code' => $data['country_code'] ?? null,
                 'referral_code' => $data['referral_code'] ?? null,
             ]);
+
+            // If user registered with a delegate code, add them to the delegate's clients list
             if (!empty($data['referral_code'])) {
-                $clients = $code->clients ?? [];
+                $userClient = UserClient::firstOrCreate(
+                    ['user_id' => $data['referral_code']],
+                    ['clients' => []]
+                );
 
+                $clients = $userClient->clients ?? [];
 
-                if (in_array($user->id, $clients)) {
-                    return response()->json([
-                        "message" => "You have already used this referral code."
-                    ]);
+                // Check if user is already in the list (shouldn't happen, but just in case)
+                if (!in_array($user->id, $clients)) {
+                    $clients[] = $user->id;
+                    $userClient->clients = $clients;
+                    $userClient->save();
                 }
-
-                $clients[] = $user->id;
-
-
-                $code->clients = $clients;
-                $code->save();
             }
 
 
