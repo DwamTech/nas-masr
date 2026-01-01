@@ -28,6 +28,8 @@ class UserPackages extends Model
         'days',
         'start_date',
         'expire_date',
+
+        'categories',
     ];
 
     protected $casts = [
@@ -47,6 +49,8 @@ class UserPackages extends Model
         'days' => 'integer',
         'start_date' => 'datetime',
         'expire_date' => 'datetime',
+
+        'categories' => 'array',
     ];
 
     protected $appends = [

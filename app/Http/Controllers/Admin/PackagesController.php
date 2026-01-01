@@ -53,6 +53,9 @@ class PackagesController extends Controller
         $v = $request->validate([
             'user_id'            => ['required', 'integer', 'exists:users,id'],
 
+            'categories'         => ['nullable', 'array'],
+            'categories.*'       => ['integer', 'exists:categories,id'],
+
             'featured_ads'       => ['nullable', 'integer', 'min:0'],
             'standard_ads'       => ['nullable', 'integer', 'min:0'],
 
@@ -70,6 +73,11 @@ class PackagesController extends Controller
         }
 
         $pkg = UserPackages::firstOrNew(['user_id' => $user->id]);
+
+        // Update categories if present
+        if (array_key_exists('categories', $v)) {
+            $pkg->categories = $v['categories'];
+        }
 
         $touchedFeatured = array_key_exists('featured_ads', $v)
             || array_key_exists('featured_days', $v)

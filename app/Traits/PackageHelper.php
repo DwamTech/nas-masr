@@ -8,7 +8,7 @@ use Illuminate\Support\Carbon;
 
 trait PackageHelper
 {
-    public function consumeForPlan(int $userId, string $planType, int $count = 1)
+    public function consumeForPlan(int $userId, string $planType, int $categoryId ,int $count = 1)
     {
         $planType = $this->normalizePlan($planType);
 
@@ -21,9 +21,18 @@ trait PackageHelper
             ], 404);
         }
 
+        if ($categoryId !== null && !empty($pkg->categories) && is_array($pkg->categories) && count($pkg->categories) > 0) {
+            $allowedCats = array_map('intval', $pkg->categories);
+            if (!in_array((int)$categoryId, $allowedCats)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'هذه الباقة غير صالحة لهذا القسم.',
+                ], 422);
+            }
+        }
+
         [$totalField, $usedField, $daysField, $startField, $expireField, $title] = $this->mapFields($planType);
 
-        // لو مفيش تاريخ انتهاء = أول استخدام، نفعل الباقة
         if (empty($pkg->{$expireField})) {
             $days = (int) ($pkg->{$daysField} ?? 0);
             if ($days > 0) {
@@ -33,7 +42,6 @@ trait PackageHelper
             }
         }
 
-        // لو الباقة منتهية
         if ($pkg->{$expireField} instanceof Carbon && $pkg->{$expireField}->isPast()) {
             return response()->json([
                 'success' => false,

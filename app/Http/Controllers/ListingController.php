@@ -230,7 +230,7 @@ class ListingController extends Controller
 
 
 
-    public function store(string $section, GenericListingRequest $request, ListingService $service ,AdminNotificationService $adminNotification)
+    public function store(string $section, GenericListingRequest $request, ListingService $service, AdminNotificationService $adminNotification)
     {
         $user = $request->user();
         $sec = Section::fromSlug($section);
@@ -269,7 +269,7 @@ class ListingController extends Controller
             $planNorm = $this->normalizePlan($data['plan_type']);
             $activeSub = UserPlanSubscription::query()
                 ->where('user_id', $user->id)
-                ->where('category_id', $sec->id())
+                // ->where('category_id', $sec->id())
                 ->where('plan_type', $planNorm)
                 ->where('payment_status', 'paid')
                 ->where(function ($q) {
@@ -279,29 +279,27 @@ class ListingController extends Controller
 
             if ($activeSub) {
                 // If subscription exists, try to consume
-                if (!$activeSub->consumeAd(1)) {
-                    // Subscription empty
-                    if ($isAdmin) {
-                        // Admin Bypass for Empty Subscription
-                        $paymentRequired = false;
-                        $activeSub = null; // Treat as no sub, fall to manual calc below
-                    } else {
-                        $paymentRequired = true;
-                        $activeSub = null;
-                    }
-                } else {
-                    $data['expire_at'] = $activeSub->expires_at;
-                    $paymentType = 'subscription';
-                    $paymentReference = $activeSub->payment_reference;
-                    $paymentMethod = $activeSub->payment_method;
-                    $priceOut = (float) ($activeSub->price ?? 0);
-                    $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
-                }
-            }
+                // if (!$activeSub->consumeAd(1)) {
+                //     // Subscription empty
+                //     if ($isAdmin) {
+                //         // Admin Bypass for Empty Subscription
+                //         $paymentRequired = false;
+                //         $activeSub = null; // Treat as no sub, fall to manual calc below
+                //     } else {
+                //         $paymentRequired = true;
+                //         $activeSub = null;
+                //     }
+                // } else {
+                //     $data['expire_at'] = $activeSub->expires_at;
+                //     $paymentType = 'subscription';
+                //     $paymentReference = $activeSub->payment_reference;
+                //     $paymentMethod = $activeSub->payment_method;
+                //     $priceOut = (float) ($activeSub->price ?? 0);
+                //     $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
+                // }
 
-            // If checking subscription failed or didn't exist
-            if (!$activeSub && !$paymentType) {
-                $packageResult = $this->consumeForPlan($user->id, $planNorm);
+                // If checking subscription failed or didn't exist
+                $packageResult = $this->consumeForPlan($user->id, $planNorm, $sec->id());
                 $packageData   = $packageResult->getData(true);
 
                 if (empty($packageData['success']) || $packageData['success'] === false) {
@@ -334,6 +332,9 @@ class ListingController extends Controller
                         : (float) ($prices?->standard_ad_price ?? 0);
                     $data['publish_via'] = env('LISTING_PUBLISH_VIA_PACKAGE', 'package');
                 }
+            } else {
+                $paymentRequired = true;
+                $message="لا تملك باقة فعّالة، يجب عليك دفع قيمة هذا الإعلان.او الاشتراك في باقه";
             }
         } else {
             $freeVia = env('LISTING_PUBLISH_VIA_FREE', 'free');
@@ -492,44 +493,45 @@ class ListingController extends Controller
                 })
                 ->first();
 
-            if ($activeSub && $activeSub->consumeAd(1)) {
-                $listing->update([
-                    'expire_at' => $activeSub->expires_at,
-                    'status' => 'Valid',
-                    'publish_via' => 'subscription',
-                    'isPayment' => true,
-                ]);
+            // if ($activeSub && $activeSub->consumeAd(1)) {
+            //     $listing->update([
+            //         'expire_at' => $activeSub->expires_at,
+            //         'status' => 'Valid',
+            //         'publish_via' => 'subscription',
+            //         'isPayment' => true,
+            //     ]);
+
+            //     return response()->json([
+            //         'success' => true,
+            //         'message' => 'تم تجديد الإعلان بنجاح عبر الاشتراك',
+            //         'data' => new ListingResource($listing)
+            //     ]);
+            // }
+            if ($activeSub) {
+                // Check package
+                $packageResult = $this->consumeForPlan($user->id, $planNorm, $sec->id());
+                $packageData   = $packageResult->getData(true);
+
+                if (!empty($packageData['success']) && $packageData['success'] === true) {
+                    $listing->update([
+                        'expire_at' => Carbon::parse($packageData['expire_date']),
+                        'status' => 'Valid',
+                        'publish_via' => 'package',
+                        'isPayment' => true,
+                    ]);
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'تم تجديد الإعلان بنجاح عبر الباقة',
+                        'data' => new ListingResource($listing)
+                    ]);
+                }
 
                 return response()->json([
-                    'success' => true,
-                    'message' => 'تم تجديد الإعلان بنجاح عبر الاشتراك',
-                    'data' => new ListingResource($listing)
-                ]);
+                    'success' => false,
+                    'message' => 'لا يوجد رصيد كافي في الاشتراك أو الباقة لتجديد الإعلان. يرجى الاشتراك أو شراء باقة.',
+                    'payment_required' => true
+                ], 402);
             }
-
-            // Check package
-            $packageResult = $this->consumeForPlan($user->id, $planNorm);
-            $packageData   = $packageResult->getData(true);
-
-            if (!empty($packageData['success']) && $packageData['success'] === true) {
-                $listing->update([
-                    'expire_at' => Carbon::parse($packageData['expire_date']),
-                    'status' => 'Valid',
-                    'publish_via' => 'package',
-                    'isPayment' => true,
-                ]);
-                return response()->json([
-                    'success' => true,
-                    'message' => 'تم تجديد الإعلان بنجاح عبر الباقة',
-                    'data' => new ListingResource($listing)
-                ]);
-            }
-
-            return response()->json([
-                'success' => false,
-                'message' => 'لا يوجد رصيد كافي في الاشتراك أو الباقة لتجديد الإعلان. يرجى الاشتراك أو شراء باقة.',
-                'payment_required' => true
-            ], 402);
         } else {
             // Free plan logic
             $freeVia = env('LISTING_PUBLISH_VIA_FREE', 'free');
