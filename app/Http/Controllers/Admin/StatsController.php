@@ -228,13 +228,13 @@ class StatsController extends Controller
             ->paginate($perPage);
 
         $data = collect($users->items())->map(function (User $u) {
-            $userCode = $u->referral_code ?: (string) $u->id;
             return [
                 'id' => $u->id,
                 'name' => $u->name,
                 'phone' => $u->phone,
                 'address' => $u->address,
-                'user_code' => $userCode,
+                'user_code' => (string) $u->id,  // Always use ID as user_code
+                'delegate_code' => $u->referral_code,  // Delegate who brought this user
                 'status' => $u->status ?? 'active',
                 'registered_at' => optional($u->created_at)->toDateString(),
                 'listings_count' => $u->listings_count ?? 0,
