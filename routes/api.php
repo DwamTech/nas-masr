@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\categoryController;
-use App\Http\Controllers\Admin\CategoryBannerController;
 use App\Http\Controllers\Admin\CategoryFieldsController;
 use App\Http\Controllers\Admin\CategoryPlanPricesController;
 use App\Http\Controllers\Admin\CategorySectionsController;
@@ -63,11 +62,6 @@ Route::get('/the-best/{section}', [BestAdvertiserController::class, 'index']);
 
 // Global Search across all listings
 Route::get('/listings/search', [ListingController::class, 'globalSearch']);
-
-// Public Banner Routes - Get banner by category slug
-Route::get('/{categorySlug}/AdBanner', [CategoryBannerController::class, 'getByCategorySlug']); // Generic (supports ?type= param)
-Route::get('/{categorySlug}/HomePageBanner', [CategoryBannerController::class, 'getHomePageBanner']); // Specific for home page
-Route::get('/{categorySlug}/AdCreationBanner', [CategoryBannerController::class, 'getAdCreationBanner']); // Specific for ad creation
 
 Route::prefix('v1/{section}')->group(function () {
     Route::bind('listing', function ($value) {
@@ -231,16 +225,6 @@ Route::prefix('admin')
             Route::get('/conversations/{conversationId}', [MonitoringController::class, 'show']);
             Route::get('/search', [MonitoringController::class, 'search']);
             Route::get('/stats', [MonitoringController::class, 'stats']);
-        });
-
-        // Category Banner Routes (Admin)
-        Route::prefix('category-banners')->group(function () {
-            Route::get('/', [CategoryBannerController::class, 'index']);
-            Route::get('/usage-report', [CategoryBannerController::class, 'usageReport']);
-            Route::get('/{banner}', [CategoryBannerController::class, 'show']);
-            Route::post('/', [CategoryBannerController::class, 'store']);
-            Route::post('/{banner}', [CategoryBannerController::class, 'update']); // Use POST for file upload with _method=PUT
-            Route::delete('/{banner}', [CategoryBannerController::class, 'destroy']);
         });
 
         // Broadcast Routes (Bulk Messages)

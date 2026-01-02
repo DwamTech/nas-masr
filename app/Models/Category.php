@@ -42,11 +42,6 @@ class Category extends Model
         return $this->hasMany(\App\Models\Listing::class);
     }
 
-    public function banners()
-    {
-        return $this->hasMany(\App\Models\CategoryBanner::class);
-    }
-
     public function planPrice()
     {
         return $this->hasOne(\App\Models\CategoryPlanPrice::class);
