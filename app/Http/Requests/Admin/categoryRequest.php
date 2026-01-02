@@ -30,16 +30,16 @@ class CategoryRequest extends FormRequest
 
         return [
 
-            // 'name' => [
-            //     // ✅ كله اختياري في التعديل
-            //     $isUpdate ? 'sometimes' : 'nullable',
-            //     'string',
-            //     'max:150',
-            // ],
-            'icon' => [
+            'name' => [
+                // ✅ كله اختياري في التعديل
                 $isUpdate ? 'sometimes' : 'nullable',
                 'string',
                 'max:150',
+            ],
+            'icon' => [
+                $isUpdate ? 'sometimes' : 'nullable',
+                'image',
+                'max:4096', // 4MB
             ],
             'default_image' => [
                 $isUpdate ? 'sometimes' : 'nullable',

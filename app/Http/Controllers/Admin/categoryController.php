@@ -31,6 +31,11 @@ class categoryController extends Controller
         return CategoryResource::collection($q->get());
     }
 
+    public function show(Category $category)
+    {
+        return new CategoryResource($category);
+    }
+
     // POST /api/admin/categories
     public function store(categoryRequest $request)
     {
@@ -38,6 +43,11 @@ class categoryController extends Controller
         if ($request->hasFile('default_image')) {
             $path = $request->file('default_image')->store('categories', 'uploads');
             $data['default_image'] = basename($path);
+        }
+
+        if ($request->hasFile('icon')) {
+            $path = $request->file('icon')->store('categories', 'uploads');
+            $data['icon'] = basename($path);
         }
 
         $cat = Category::create($data);
@@ -62,6 +72,11 @@ class categoryController extends Controller
             $data['default_image'] = basename($path);
         }
 
+        if ($request->hasFile('icon')) {
+            $path = $request->file('icon')->store('categories', 'uploads');
+            $data['icon'] = basename($path);
+        }
+
         $category->update($data);
 
         return response()->json([
@@ -77,6 +92,23 @@ class categoryController extends Controller
 
         return response()->json([
             'message' => 'تم تعطيل القسم',
+        ]);
+    }
+
+    public function usageReport()
+    {
+        $categories = Category::withCount('listings')->get();
+
+        return response()->json([
+            'data' => $categories->map(function ($cat) {
+                return [
+                    'id' => $cat->id,
+                    'name' => $cat->name,
+                    'slug' => $cat->slug,
+                    'icon_url' => $cat->icon_url,
+                    'listings_count' => $cat->listings_count,
+                ];
+            }),
         ]);
     }
 }

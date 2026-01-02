@@ -37,6 +37,11 @@ class Category extends Model
 
         return asset('storage/uploads/categories/' . $this->default_image);
     }
+    public function listings()
+    {
+        return $this->hasMany(\App\Models\Listing::class);
+    }
+
     public function planPrice()
     {
         return $this->hasOne(\App\Models\CategoryPlanPrice::class);

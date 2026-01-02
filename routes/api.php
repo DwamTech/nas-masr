@@ -109,11 +109,13 @@ Route::prefix('admin')
         Route::delete('category-fields/{categoryField}', [CategoryFieldsController::class, 'destroy']);
 
         // Category Routes
+        Route::get('categories/usage-report', [categoryController::class, 'usageReport']);
         Route::post('categories', [CategoryController::class, 'store']);
         Route::put('categories/{category}', [CategoryController::class, 'update']);
         Route::delete('categories/{category}', [CategoryController::class, 'destroy']);
         //all categories for admin
         Route::get('categories', [categoryController::class, 'index']);
+        Route::get('categories/{category}', [categoryController::class, 'show']);
 
         // System Settings Routes
         // Route::apiResource('system-settings', SystemSettingController::class);
