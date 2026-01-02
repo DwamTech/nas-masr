@@ -6,8 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class CategoryBanner extends Model
 {
+    const TYPE_HOME_PAGE = 'home_page';
+    const TYPE_AD_CREATION = 'ad_creation';
+
     protected $fillable = [
         'category_id',
+        'banner_type',
         'banner_image',
         'is_active',
         'display_order',

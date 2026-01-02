@@ -64,8 +64,10 @@ Route::get('/the-best/{section}', [BestAdvertiserController::class, 'index']);
 // Global Search across all listings
 Route::get('/listings/search', [ListingController::class, 'globalSearch']);
 
-// Public Banner Route - Get banner by category slug
-Route::get('/{categorySlug}/AdBanner', [CategoryBannerController::class, 'getByCategorySlug']);
+// Public Banner Routes - Get banner by category slug
+Route::get('/{categorySlug}/AdBanner', [CategoryBannerController::class, 'getByCategorySlug']); // Generic (supports ?type= param)
+Route::get('/{categorySlug}/HomePageBanner', [CategoryBannerController::class, 'getHomePageBanner']); // Specific for home page
+Route::get('/{categorySlug}/AdCreationBanner', [CategoryBannerController::class, 'getAdCreationBanner']); // Specific for ad creation
 
 Route::prefix('v1/{section}')->group(function () {
     Route::bind('listing', function ($value) {

@@ -26,6 +26,10 @@ class CategoryBannerRequest extends FormRequest
                 $isUpdate ? 'sometimes' : 'required',
                 'exists:categories,id',
             ],
+            'banner_type' => [
+                $isUpdate ? 'sometimes' : 'required',
+                'in:home_page,ad_creation',
+            ],
             'banner_image' => [
                 $isUpdate ? 'sometimes' : 'nullable',
                 'image',
@@ -47,6 +51,7 @@ class CategoryBannerRequest extends FormRequest
     {
         return [
             'category_id' => 'القسم',
+            'banner_type' => 'نوع البانر',
             'banner_image' => 'صورة البانر',
             'is_active' => 'مفعل',
             'display_order' => 'ترتيب العرض',

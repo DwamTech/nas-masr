@@ -13,11 +13,17 @@ class CategoryBannerController extends Controller
     /**
      * Display all banners (Admin)
      */
-    public function index()
+    public function index(Request $request)
     {
-        $banners = CategoryBanner::with('category')
-            ->orderBy('display_order', 'asc')
-            ->get();
+        $query = CategoryBanner::with('category')
+            ->orderBy('display_order', 'asc');
+
+        // Filter by type if provided
+        if ($request->filled('banner_type')) {
+            $query->where('banner_type', $request->banner_type);
+        }
+
+        $banners = $query->get();
 
         return response()->json([
             'data' => $banners->map(function ($banner) {
@@ -26,6 +32,7 @@ class CategoryBannerController extends Controller
                     'category_id' => $banner->category_id,
                     'category_name' => $banner->category?->name,
                     'category_slug' => $banner->category?->slug,
+                    'banner_type' => $banner->banner_type,
                     'banner_url' => $banner->banner_url,
                     'is_active' => $banner->is_active,
                     'display_order' => $banner->display_order,
@@ -48,6 +55,7 @@ class CategoryBannerController extends Controller
                 'category_id' => $banner->category_id,
                 'category_name' => $banner->category?->name,
                 'category_slug' => $banner->category?->slug,
+                'banner_type' => $banner->banner_type,
                 'banner_url' => $banner->banner_url,
                 'is_active' => $banner->is_active,
                 'display_order' => $banner->display_order,
@@ -108,11 +116,19 @@ class CategoryBannerController extends Controller
     }
 
     /**
-     * Usage Report - Shows banners per category
+     * Usage Report - Shows banners per category grouped by type
      */
     public function usageReport()
     {
-        $categories = Category::withCount('banners')->get();
+        $categories = Category::withCount([
+            'banners',
+            'banners as home_banners_count' => function ($query) {
+                $query->where('banner_type', CategoryBanner::TYPE_HOME_PAGE);
+            },
+            'banners as ad_creation_banners_count' => function ($query) {
+                $query->where('banner_type', CategoryBanner::TYPE_AD_CREATION);
+            },
+        ])->get();
 
         return response()->json([
             'data' => $categories->map(function ($cat) {
@@ -120,16 +136,62 @@ class CategoryBannerController extends Controller
                     'id' => $cat->id,
                     'name' => $cat->name,
                     'slug' => $cat->slug,
-                    'banners_count' => $cat->banners_count,
+                    'total_banners' => $cat->banners_count,
+                    'home_page_banners' => $cat->home_banners_count,
+                    'ad_creation_banners' => $cat->ad_creation_banners_count,
                 ];
             }),
         ]);
     }
 
     /**
-     * Get banner by category slug (Public endpoint)
+     * Get banner by category slug and type (Public endpoint)
      */
-    public function getByCategorySlug(string $categorySlug)
+    public function getByCategorySlug(string $categorySlug, Request $request)
+    {
+        $category = Category::where('slug', $categorySlug)->first();
+
+        if (!$category) {
+            return response()->json([
+                'message' => 'القسم غير موجود',
+            ], 404);
+        }
+
+        // Default to home_page if not specified
+        $bannerType = $request->query('type', CategoryBanner::TYPE_HOME_PAGE);
+        
+        // Validate type
+        if (!in_array($bannerType, [CategoryBanner::TYPE_HOME_PAGE, CategoryBanner::TYPE_AD_CREATION])) {
+            $bannerType = CategoryBanner::TYPE_HOME_PAGE;
+        }
+
+        $banner = CategoryBanner::where('category_id', $category->id)
+            ->where('banner_type', $bannerType)
+            ->where('is_active', true)
+            ->orderBy('display_order', 'asc')
+            ->first();
+
+        if (!$banner) {
+            return response()->json([
+                'message' => 'لا يوجد بانر متاح لهذا القسم',
+                'data' => null,
+            ]);
+        }
+
+        return response()->json([
+            'data' => [
+                'id' => $banner->id,
+                'banner_url' => $banner->banner_url,
+                'category' => $category->name,
+                'banner_type' => $banner->banner_type,
+            ],
+        ]);
+    }
+
+    /**
+     * Get Home Page Banner (Public - Specific endpoint)
+     */
+    public function getHomePageBanner(string $categorySlug)
     {
         $category = Category::where('slug', $categorySlug)->first();
 
@@ -140,13 +202,49 @@ class CategoryBannerController extends Controller
         }
 
         $banner = CategoryBanner::where('category_id', $category->id)
+            ->where('banner_type', CategoryBanner::TYPE_HOME_PAGE)
             ->where('is_active', true)
             ->orderBy('display_order', 'asc')
             ->first();
 
         if (!$banner) {
             return response()->json([
-                'message' => 'لا يوجد بانر متاح لهذا القسم',
+                'message' => 'لا يوجد بانر للصفحة الرئيسية في هذا القسم',
+                'data' => null,
+            ]);
+        }
+
+        return response()->json([
+            'data' => [
+                'id' => $banner->id,
+                'banner_url' => $banner->banner_url,
+                'category' => $category->name,
+            ],
+        ]);
+    }
+
+    /**
+     * Get Ad Creation Banner (Public - Specific endpoint)
+     */
+    public function getAdCreationBanner(string $categorySlug)
+    {
+        $category = Category::where('slug', $categorySlug)->first();
+
+        if (!$category) {
+            return response()->json([
+                'message' => 'القسم غير موجود',
+            ], 404);
+        }
+
+        $banner = CategoryBanner::where('category_id', $category->id)
+            ->where('banner_type', CategoryBanner::TYPE_AD_CREATION)
+            ->where('is_active', true)
+            ->orderBy('display_order', 'asc')
+            ->first();
+
+        if (!$banner) {
+            return response()->json([
+                'message' => 'لا يوجد بانر لصفحة إضافة الإعلان في هذا القسم',
                 'data' => null,
             ]);
         }
