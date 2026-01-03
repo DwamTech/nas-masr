@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             SystemSettingsSeeder::class,
             AdminSeeder::class,
             CategorySectionsSeeder::class,
+            CategoryBannerSeeder::class,
         ]);
     }
 }
