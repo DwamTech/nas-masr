@@ -162,6 +162,8 @@ Route::prefix('admin')
         //User packages
         Route::post('/user-packages', [PackagesController::class, 'storeOrUpdate']);
         Route::get('/packages', [PackagesController::class, 'index']);
+        Route::get('/users/{user}/package', [PackagesController::class, 'getUserPackage']);
+
 
 
         Route::post('governorates', [GovernorateController::class, 'storeGov']);
