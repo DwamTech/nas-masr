@@ -66,7 +66,8 @@ class NotificationController extends Controller
             $data['title'],
             $data['body'],
             $data['type'] ?? null,
-            $data['data'] ?? null
+            $data['data'] ?? null,
+            true // Bypass cooldown for admin
         );
 
         return response()->json([

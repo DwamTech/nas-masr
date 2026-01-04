@@ -22,15 +22,16 @@ class NotificationService
         $this->firebase = $firebase;
     }
 
-    public function dispatch(int $userId, string $title, string $body, ?string $type = null, ?array $data = null): array
+    public function dispatch(int $userId, string $title, string $body, ?string $type = null, ?array $data = null, bool $bypassCooldown = false): array
     {
         $user = User::findOrFail($userId);
 
         // ✅ إشعارات الأدمن: لا قيود، لا cooldown، لا شيء - تنفيذ فوري
-        if ($type === 'الاداره') {
+        if ($type === 'الاداره' || $bypassCooldown) {
             Log::info('🔵 Admin notification bypass activated', [
                 'user_id' => $userId,
                 'title' => $title,
+                'bypass_flag' => $bypassCooldown
             ]);
 
             // Create internal notification
