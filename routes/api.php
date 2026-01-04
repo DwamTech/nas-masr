@@ -173,6 +173,8 @@ Route::prefix('admin')
         // Route::post('governorates/{governorate}/cities', [GovernorateController::class, 'addCity']);
         Route::put('cities/{city}', [GovernorateController::class, 'updateCity']);
         Route::delete('cities/{city}', [GovernorateController::class, 'deleteCity']);
+        Route::get('cities/mappings', [GovernorateController::class, 'getCitiesMappings']);
+
 
 
         Route::post('makes', [MakeController::class, 'addMake']);
