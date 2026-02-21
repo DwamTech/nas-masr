@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://192.168.1.30:3000', 'http://localhost:3000'],
+    'allowed_origins' => ['http://192.168.1.30:3000', 'http://localhost:3000', 'http://192.168.119.1:3000','https://www.nasmasr.app'],
 
     'allowed_origins_patterns' => [],
 

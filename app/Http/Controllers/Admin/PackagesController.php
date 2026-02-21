@@ -45,6 +45,61 @@ class PackagesController extends Controller
     }
 
     /**
+     * GET /api/admin/users/{user}/package
+     * جلب معلومات الـ packages الخاصة بيوزر معين
+     */
+    public function getUserPackage(User $user): JsonResponse
+    {
+        $pkg = UserPackages::where('user_id', $user->id)->first();
+
+        if (!$pkg) {
+            return response()->json([
+                'message' => 'No package found for this user',
+                'data' => null,
+            ], 404);
+        }
+
+        // Format the package data with detailed information
+        $data = [
+            'id' => $pkg->id,
+            'user_id' => $pkg->user_id,
+            'user_name' => $user->name,
+            'user_phone' => $user->phone,
+            
+            // Featured Package
+            'featured' => [
+                'ads_total' => (int) ($pkg->featured_ads ?? 0),
+                'ads_used' => (int) ($pkg->featured_ads_used ?? 0),
+                'ads_remaining' => (int) $pkg->featured_ads_remaining,
+                'days' => (int) ($pkg->featured_days ?? 0),
+                'start_date' => $pkg->featured_start_date,
+                'expire_date' => $pkg->featured_expire_date,
+                'active' => (bool) $pkg->featured_active,
+            ],
+            
+            // Standard Package
+            'standard' => [
+                'ads_total' => (int) ($pkg->standard_ads ?? 0),
+                'ads_used' => (int) ($pkg->standard_ads_used ?? 0),
+                'ads_remaining' => (int) $pkg->standard_ads_remaining,
+                'days' => (int) ($pkg->standard_days ?? 0),
+                'start_date' => $pkg->standard_start_date,
+                'expire_date' => $pkg->standard_expire_date,
+                'active' => (bool) $pkg->standard_active,
+            ],
+            
+            'categories' => $pkg->categories ?? [],
+            'created_at' => $pkg->created_at,
+            'updated_at' => $pkg->updated_at,
+        ];
+
+        return response()->json([
+            'message' => 'Package retrieved successfully',
+            'data' => $data,
+        ]);
+    }
+
+    /**
      * POST /api/user-packages
      * body: user_id, featured_ads, standard_ads, days, start_date?, expire_date?
      */

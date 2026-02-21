@@ -138,4 +138,41 @@ class GovernorateController extends Controller
             'message' => 'تم حذف المدينة بنجاح.',
         ], 200);
     }
+
+    /**
+     * GET /api/admin/cities/mappings
+     * جلب mapping للمدن مع IDs الخاصة بها منظم حسب المحافظة
+     */
+    public function getCitiesMappings()
+    {
+        $governorates = Governorate::with('cities')->orderBy('name')->get();
+
+        $byGovernorateId = [];
+        $byGovernorateNam = [];
+
+        foreach ($governorates as $gov) {
+            $citiesById = [];
+            $citiesByName = [];
+
+            foreach ($gov->cities as $city) {
+                $citiesById[$city->name] = $city->id;
+                $citiesByName[$city->name] = $city->id;
+            }
+
+            // Map by governorate ID
+            $byGovernorateId[(string)$gov->id] = $citiesById;
+
+            // Map by governorate name
+            $byGovernorateNam[$gov->name] = $citiesByName;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'by_governorate_id' => $byGovernorateId,
+                'by_governorate_name' => $byGovernorateNam,
+            ]
+        ]);
+    }
 }
+

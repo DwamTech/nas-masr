@@ -161,9 +161,9 @@ class BestAdvertiserController extends Controller
     {
         $data = $request->validate([
             'user_id'        => ['required', 'integer', 'exists:users,id'],
-            'category_ids'   => ['required', 'array', 'min:1'],
+            'category_ids'   => ['required', 'array'],
             'category_ids.*' => ['integer'],
-            'max_listings'   => ['nullable', 'integer', 'min:1'],
+            'max_listings'   => ['nullable', 'integer'],
             'is_active'      => ['boolean'],
         ]);
 

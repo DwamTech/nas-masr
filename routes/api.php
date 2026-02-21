@@ -166,6 +166,8 @@ Route::prefix('admin')
         //User packages
         Route::post('/user-packages', [PackagesController::class, 'storeOrUpdate']);
         Route::get('/packages', [PackagesController::class, 'index']);
+        Route::get('/users/{user}/package', [PackagesController::class, 'getUserPackage']);
+
 
 
         Route::post('governorates', [GovernorateController::class, 'storeGov']);
@@ -175,6 +177,8 @@ Route::prefix('admin')
         // Route::post('governorates/{governorate}/cities', [GovernorateController::class, 'addCity']);
         Route::put('cities/{city}', [GovernorateController::class, 'updateCity']);
         Route::delete('cities/{city}', [GovernorateController::class, 'deleteCity']);
+        Route::get('cities/mappings', [GovernorateController::class, 'getCitiesMappings']);
+
 
 
         Route::post('makes', [MakeController::class, 'addMake']);
