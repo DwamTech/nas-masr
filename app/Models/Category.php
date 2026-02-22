@@ -9,6 +9,7 @@ class Category extends Model
     protected $fillable = [
         'slug',
         'name',
+        'title',
         'icon',
         'default_image',
         'sort_order',

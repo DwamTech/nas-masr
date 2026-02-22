@@ -9,6 +9,7 @@ class CategoryMainSection extends Model
     protected $fillable = [
         'category_id',
         'name',
+        'title',
         'sort_order',
         'is_active',
     ];

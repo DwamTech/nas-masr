@@ -71,12 +71,14 @@ class CategorySectionsController extends Controller
      *     {
      *       "id": 1,                    // اختياري (للتعديل)
      *       "name": "ملابس رجالي كاجوال",
+     *       "title": "عنوان اختياري",   // اختياري
      *       "sort_order": 1,            // اختياري
      *       "is_active": true,          // اختياري
      *       "sub_sections": [
      *         {
      *           "id": 10,               // اختياري (للتعديل)
      *           "name": "تيشيرت",
+     *           "title": "عنوان اختياري", // اختياري
      *           "sort_order": 1,        // اختياري
      *           "is_active": true       // اختياري
      *         }
@@ -104,6 +106,7 @@ class CategorySectionsController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:191'],
+            'title' => ['nullable', 'string', 'max:255'],
         ]);
 
         $main = CategoryMainSection::where('category_id', $category->id)
@@ -116,6 +119,7 @@ class CategorySectionsController extends Controller
             $main = CategoryMainSection::create([
                 'category_id' => $category->id,
                 'name'        => $data['name'],
+                'title'       => $data['title'] ?? null,
                 'sort_order'  => (CategoryMainSection::where('category_id', $category->id)->max('sort_order') ?? 0) + 1,
                 'is_active'   => true,
             ]);
@@ -196,6 +200,11 @@ class CategorySectionsController extends Controller
                     ->where(fn($q) => $q->where('category_id', $mainSection->category_id))
                     ->ignore($mainSection->id),
             ],
+            'title' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
         ]);
 
         $mainSection->update($data);
@@ -241,6 +250,11 @@ class CategorySectionsController extends Controller
                             ->where('main_section_id', $subSection->main_section_id)
                     )
                     ->ignore($subSection->id),
+            ],
+            'title' => [
+                'nullable',
+                'string',
+                'max:255',
             ],
         ]);
 
