@@ -8,41 +8,53 @@ use Illuminate\Support\Facades\Log;
 
 class OtpController extends Controller
 {
-    public function send(Request $request)
-    {
-        $request->validate([
-            'phone' => 'required|string', // E.164 format e.g. +201226099886
-        ]);
+   public function send(Request $request)
+{
+    $request->validate([
+        'phone' => 'required|string',
+    ]);
 
-        $phone = $request->input('phone');
-        
-        try {
-            $twilio = new Client(
-                config('services.twilio.account_sid'),
-                config('services.twilio.auth_token')
-            );
+    $phone = $request->input('phone');
 
-            $verification = $twilio->verify->v2->services(config('services.twilio.verify_service_sid'))
-                ->verifications
-                ->create($phone, 'whatsapp');
+    try {
+        $twilio = new \Twilio\Rest\Client(
+            config('services.twilio.account_sid'),
+            config('services.twilio.auth_token')
+        );
 
-            return response()->json([
-                'status' => $verification->status,
-                'sid' => $verification->sid,
-                'to' => $verification->to,
-                'channel' => $verification->channel,
-                'ok' => true
-            ]);
+        $verification = $twilio->verify->v2
+            ->services(config('services.twilio.verify_service_sid'))
+            ->verifications
+            ->create($phone, 'whatsapp');
 
-        } catch (\Exception $e) {
-            Log::error('Twilio Send OTP Error: ' . $e->getMessage());
+        // لو لأي سبب القناة مش WhatsApp اعتبريها فشل
+        if (($verification->channel ?? null) !== 'whatsapp') {
             return response()->json([
                 'ok' => false,
-                'message' => $e->getMessage()
-            ], 500);
+                'message' => 'WhatsApp was not used. Check Verify Service WhatsApp sender binding.',
+                'status' => $verification->status ?? null,
+                'channel' => $verification->channel ?? null,
+                'sid' => $verification->sid ?? null,
+            ], 400);
         }
-    }
 
+        return response()->json([
+            'ok' => true,
+            'status' => $verification->status,
+            'sid' => $verification->sid,
+            'to' => $verification->to,
+            'channel' => $verification->channel,
+        ]);
+
+    } catch (\Twilio\Exceptions\TwilioException $e) {
+        return response()->json([
+            'ok' => false,
+            'message' => $e->getMessage(),
+            'code' => $e->getCode(),
+            'more_info' => method_exists($e, 'getMoreInfo') ? $e->getMoreInfo() : null,
+        ], 500);
+    }
+} 
     public function verify(Request $request)
     {
         $request->validate([
