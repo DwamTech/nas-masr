@@ -29,6 +29,7 @@ class ListingService
 
 
             $common = Arr::only($data, [
+                'title',
                 'price',
                 'description',
                 'governorate_id',
@@ -86,6 +87,7 @@ class ListingService
 
 
             $listing->update(Arr::only($data, [
+                'title',
                 'price',
                 'description',
                 'governorate_id',
