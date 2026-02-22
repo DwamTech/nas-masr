@@ -36,6 +36,11 @@ class CategoryRequest extends FormRequest
                 'string',
                 'max:150',
             ],
+            'title' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'icon' => [
                 $isUpdate ? 'sometimes' : 'nullable',
                 'image',
@@ -58,6 +63,7 @@ class CategoryRequest extends FormRequest
         return [
             // 'slug'      => 'المعرف (slug)',
             // 'name'      => 'الاسم',
+            'title'     => 'العنوان',
             'icon'      => 'الأيقونة',
             'is_active' => 'مفعل',
         ];

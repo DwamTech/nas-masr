@@ -11,6 +11,7 @@ class CategorySubSection extends Model
         'category_id',
         'main_section_id',
         'name',
+        'title',
         'sort_order',
         'is_active',
     ];

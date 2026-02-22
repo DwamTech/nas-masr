@@ -158,6 +158,7 @@ final class Section
             : ['required', 'string', 'in:standard,premium,featured,free'];
 
         $base = [
+            'title' => ['nullable', 'string', 'max:180'],
             'price' => $priceRules,
             'description' => ['required', 'string'],
 
