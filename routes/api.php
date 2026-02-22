@@ -31,6 +31,10 @@ use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\PlansController;
 use App\Http\Controllers\ListingReportController;
+use App\Http\Controllers\OtpController;
+
+Route::post('/otp/send', [OtpController::class, 'send']);
+Route::post('/otp/verify', [OtpController::class, 'verify']);
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('v1/test', fn() => response()->json(['ok' => true]));
