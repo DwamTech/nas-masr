@@ -794,6 +794,7 @@ class ListingController extends Controller
                 'category_id' => $item->category_id,
                 'category_name' => $cat?->name,
                 'category_slug' => $cat?->slug,
+                'title' => $item->title,
                 'description' => $item->description,
                 'price' => $item->price,
                 'address' => $item->address,
