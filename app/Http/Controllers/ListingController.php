@@ -270,51 +270,65 @@ class ListingController extends Controller
         if (!empty($data['plan_type']) && $data['plan_type'] !== 'free') {
             $planNorm = $this->normalizePlan($data['plan_type']);
 
-            // 1. Try to consume from Package (UserPackages) first - This is what Admin creates
-            $packageResult = $this->consumeForPlan($user->id, $planNorm, $sec->id());
-            $packageData   = $packageResult->getData(true);
+            // Check if plan price is 0 (free plan in this category)
+            $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
+            $planPrice = $planNorm === 'featured'
+                ? (float) ($prices?->featured_ad_price ?? 0)
+                : (float) ($prices?->standard_ad_price ?? 0);
 
-            if (!empty($packageData['success']) && $packageData['success'] === true) {
-                // Success! Package consumed
-                $data['expire_at'] = Carbon::parse($packageData['expire_date']);
-                $paymentType = 'package';
-                $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
-                $priceOut = $planNorm === 'featured'
-                    ? (float) ($prices?->featured_ad_price ?? 0)
-                    : (float) ($prices?->standard_ad_price ?? 0);
-                $data['publish_via'] = env('LISTING_PUBLISH_VIA_PACKAGE', 'package');
+            // 0. If plan price is 0, accept ad without any checks
+            if ($planPrice == 0) {
+                $days = $planNorm === 'featured'
+                    ? ((int)($prices?->featured_days ?? 30))
+                    : ((int)($prices?->standard_days ?? 30));
+
+                $data['expire_at'] = now()->addDays($days > 0 ? $days : 30);
+                $paymentType = 'free_plan';
+                $priceOut = 0.0;
+                $data['publish_via'] = 'free_plan';
             } else {
-                // 2. If no Package, check for legacy Subscription (UserPlanSubscription)
-                $activeSub = UserPlanSubscription::query()
-                    ->where('user_id', $user->id)
-                    ->where('plan_type', $planNorm)
-                    ->where('payment_status', 'paid')
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
-                    })
-                    ->first();
+                // 1. Try to consume from Package (UserPackages) first - This is what Admin creates
+                $packageResult = $this->consumeForPlan($user->id, $planNorm, $sec->id());
+                $packageData   = $packageResult->getData(true);
 
-                if ($activeSub) {
-                    $data['expire_at'] = $activeSub->expires_at;
-                    $paymentType = 'subscription';
-                    $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
-                    // Note: Consumption logic for subscription can be added here if needed
-                } elseif ($isAdmin) {
-                    // 3. Admin Bypass
-                    $paymentRequired = false;
-                    $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
-                    $days = $planNorm === 'featured'
-                        ? ((int)($prices?->featured_days ?? 30))
-                        : ((int)($prices?->standard_days ?? 30));
-
-                    $data['expire_at'] = now()->addDays($days > 0 ? $days : 30);
-                    $paymentType = 'admin_bypass';
-                    $priceOut = 0.0;
-                    $data['publish_via'] = 'admin';
+                if (!empty($packageData['success']) && $packageData['success'] === true) {
+                    // Success! Package consumed
+                    $data['expire_at'] = Carbon::parse($packageData['expire_date']);
+                    $paymentType = 'package';
+                    $priceOut = $planPrice;
+                    $data['publish_via'] = env('LISTING_PUBLISH_VIA_PACKAGE', 'package');
                 } else {
-                    // 4. No Package, No Sub -> Payment Required
-                    $paymentRequired = true;
-                    $message = $packageData['message'] ?? "لا تملك باقة فعّالة أو رصيد كافٍ، يجب عليك الدفع لنشر هذا الإعلان.";
+                    // 2. If no Package, check for legacy Subscription (UserPlanSubscription)
+                    $activeSub = UserPlanSubscription::query()
+                        ->where('user_id', $user->id)
+                        ->where('plan_type', $planNorm)
+                        ->where('payment_status', 'paid')
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+                        })
+                        ->first();
+
+                    if ($activeSub) {
+                        $data['expire_at'] = $activeSub->expires_at;
+                        $paymentType = 'subscription';
+                        $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
+                        // Note: Consumption logic for subscription can be added here if needed
+                    } elseif ($isAdmin) {
+                        // 3. Admin Bypass
+                        $paymentRequired = false;
+                        $days = $planNorm === 'featured'
+                            ? ((int)($prices?->featured_days ?? 30))
+                            : ((int)($prices?->standard_days ?? 30));
+
+                        $data['expire_at'] = now()->addDays($days > 0 ? $days : 30);
+                        $paymentType = 'admin_bypass';
+                        $priceOut = 0.0;
+                        $data['publish_via'] = 'admin';
+                    } else {
+                        // 4. No Package, No Sub -> Payment Required
+                        $paymentRequired = true;
+                        $message = $packageData['message'] ?? "لا تملك باقة فعّالة أو رصيد كافٍ، يجب عليك الدفع لنشر هذا الإعلان.";
+                    }
                 }
             }
         } else {
