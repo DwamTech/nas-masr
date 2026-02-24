@@ -25,18 +25,10 @@ final class Section
             ->where('category_slug', $slug)
             ->where('is_active', true)
             ->orderBy('sort_order')
-            ->get()
-            ->transform(function ($field) {
-                if (!empty($field->options) && is_array($field->options)) {
-                    if (!in_array('غير ذلك', $field->options)) {
-                        $options = $field->options;
-                        $options[] = 'غير ذلك';
-                        $field->options = $options;
-                    }
-                }
-                return $field;
-            })
-            ->toArray();
+            ->get();
+
+        // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
+        $fields = OptionsHelper::processFieldsCollection($fields)->toArray();
 
         return new self(
             slug: $slug,
@@ -60,18 +52,10 @@ final class Section
             ->where('category_slug', $cat->slug)
             ->where('is_active', true)
             ->orderBy('sort_order')
-            ->get()
-            ->transform(function ($field) {
-                if (!empty($field->options) && is_array($field->options)) {
-                    if (!in_array('غير ذلك', $field->options)) {
-                        $options = $field->options;
-                        $options[] = 'غير ذلك';
-                        $field->options = $options;
-                    }
-                }
-                return $field;
-            })
-            ->toArray();
+            ->get();
+
+        // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
+        $fields = OptionsHelper::processFieldsCollection($fields)->toArray();
 
         return new self(
             slug: $cat->slug,

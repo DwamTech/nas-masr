@@ -11,6 +11,7 @@ use App\Models\CategoryField;
 use App\Models\Governorate;
 use App\Models\Make;
 use App\Support\Section;
+use App\Support\OptionsHelper;
 use Illuminate\Http\Request;
 use App\Models\CategoryMainSection;
 use App\Models\CategorySubSection;
@@ -33,17 +34,8 @@ class CategoryFieldsController extends Controller
 
         $fields = $q->get();
 
-        // Append "غير ذلك" to options if not present
-        $fields->transform(function ($field) {
-            if (!empty($field->options) && is_array($field->options)) {
-                if (!in_array('غير ذلك', $field->options)) {
-                    $options = $field->options;
-                    $options[] = 'غير ذلك';
-                    $field->options = $options;
-                }
-            }
-            return $field;
-        });
+        // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
+        $fields = OptionsHelper::processFieldsCollection($fields);
 
         $governorates = Governorate::with('cities')->get();
 
@@ -100,11 +92,9 @@ class CategoryFieldsController extends Controller
         );
 
         if (empty($data['options'])) {
-            $data['options'] = [];
+            $data['options'] = [OptionsHelper::OTHER_OPTION];
         } else {
-            if (!in_array('غير ذلك', $data['options'])) {
-                $data['options'][] = 'غير ذلك';
-            }
+            $data['options'] = OptionsHelper::processOptions($data['options']);
         }
 
         $field = CategoryField::create($data);
@@ -131,7 +121,7 @@ class CategoryFieldsController extends Controller
         }
 
         if (isset($data['options']) && is_array($data['options'])) {
-
+            // تنظيف وإزالة التكرار
             $clean = [];
             foreach ($data['options'] as $opt) {
                 $value = trim((string) $opt);
@@ -140,11 +130,10 @@ class CategoryFieldsController extends Controller
                 }
             }
 
-            $data['options'] = array_values(array_unique($clean));
+            $clean = array_values(array_unique($clean));
             
-            if (!empty($data['options']) && !in_array('غير ذلك', $data['options'])) {
-                $data['options'][] = 'غير ذلك';
-            }
+            // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
+            $data['options'] = OptionsHelper::processOptions($clean);
         }
 
         unset($data['field_name']);
