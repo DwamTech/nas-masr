@@ -17,49 +17,23 @@ class MakeController extends Controller
     {
         $items = Make::with('models')->get();
         
-        \Log::info('MakeController::index - Total makes: ' . $items->count());
-        
-        // ✅ معالجة الماركات والموديلات - ترتيب عكسي مع "غير ذلك" في الآخر
+        // معالجة الماركات والموديلات (الترتيب سيتم في الفرونت إند)
         $makesArray = [];
         foreach ($items as $make) {
-            $makesArray[$make->id] = [
+            $modelNames = $make->models->pluck('name')->toArray();
+            // معالجة الموديلات لضمان "غير ذلك" في الآخر
+            $processedModels = \App\Support\OptionsHelper::processOptions($modelNames, false, false);
+            
+            $makesArray[] = [
                 'id' => $make->id,
                 'name' => $make->name,
-                'models' => $make->models->pluck('name')->toArray()
+                'models' => collect($processedModels)->map(function($modelName) use ($make) {
+                    return (object)[
+                        'name' => $modelName,
+                        'make_id' => $make->id
+                    ];
+                })->all()
             ];
-        }
-        
-        \Log::info('MakeController::index - Before sorting: ' . json_encode(array_column($makesArray, 'name')));
-        
-        // ترتيب الموديلات داخل كل ماركة عكسياً
-        foreach ($makesArray as $makeId => $makeData) {
-            $makesArray[$makeId]['models'] = \App\Support\OptionsHelper::processOptions(
-                $makeData['models'],
-                $shouldSort = true,
-                $reverseSort = true
-            );
-        }
-        
-        // ترتيب الماركات نفسها عكسياً حسب الاسم
-        usort($makesArray, function($a, $b) {
-            // استخدام Collator للترتيب العربي
-            $collator = new \Collator('ar');
-            if ($collator === null) {
-                return strcmp($b['name'], $a['name']); // fallback
-            }
-            return $collator->compare($b['name'], $a['name']); // عكسي
-        });
-        
-        \Log::info('MakeController::index - After sorting: ' . json_encode(array_column($makesArray, 'name')));
-        
-        // تحويل الموديلات من array إلى objects
-        foreach ($makesArray as &$makeData) {
-            $makeData['models'] = collect($makeData['models'])->map(function($modelName) use ($makeData) {
-                return (object)[
-                    'name' => $modelName,
-                    'make_id' => $makeData['id']
-                ];
-            })->all();
         }
         
         // إضافة "غير ذلك" في الآخر
@@ -186,13 +160,9 @@ class MakeController extends Controller
     {
         $models = $make->models()->get();
         
-        // ✅ ترتيب الموديلات عكسياً
+        // معالجة الموديلات (الترتيب سيتم في الفرونت إند)
         $modelNames = $models->pluck('name')->toArray();
-        $modelNames = \App\Support\OptionsHelper::processOptions(
-            $modelNames,
-            $shouldSort = true,
-            $reverseSort = true
-        );
+        $modelNames = \App\Support\OptionsHelper::processOptions($modelNames, false, false);
         
         // تحويل إلى objects مع الحفاظ على الترتيب
         $sortedModels = collect($modelNames)->map(function($name) use ($models, $make) {

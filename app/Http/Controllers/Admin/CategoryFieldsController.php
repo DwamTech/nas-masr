@@ -34,48 +34,22 @@ class CategoryFieldsController extends Controller
 
         $fields = $q->get();
 
-        // ✅ استخدام OptionsHelper مع الترتيب العكسي (Z to A)
-        $fields = OptionsHelper::processFieldsCollection(
-            $fields, 
-            $shouldSort = true,      // نعم، نريد ترتيب
-            $reverseSort = true      // نعم، ترتيب عكسي
-        );
+        // معالجة الحقول لضمان "غير ذلك" في الآخر (بدون ترتيب - سيتم الترتيب في الفرونت إند)
+        $fields = OptionsHelper::processFieldsCollection($fields, false, false);
 
-        // ✅ جلب المحافظات مع المدن وترتيبها عكسياً
+        // جلب المحافظات مع المدن
         $governorates = Governorate::with('cities')->get();
         
-        // ترتيب المحافظات والمدن عكسياً
+        // تحويل للصيغة المطلوبة (الترتيب سيتم في الفرونت إند)
         $governoratesArray = [];
         foreach ($governorates as $governorate) {
             $cityNames = $governorate->cities->pluck('name')->toArray();
-            $governoratesArray[$governorate->name] = $cityNames;
-        }
-        
-        // ترتيب المدن داخل كل محافظة عكسياً
-        $governoratesArray = OptionsHelper::processOptionsMap(
-            $governoratesArray,
-            $shouldSort = true,
-            $reverseSort = true
-        );
-        
-        // ترتيب أسماء المحافظات نفسها عكسياً
-        $governorateNames = array_keys($governoratesArray);
-        $governorateNames = OptionsHelper::processOptions(
-            $governorateNames,
-            $shouldSort = true,
-            $reverseSort = true
-        );
-        
-        // إعادة ترتيب المصفوفة حسب المحافظات المرتبة
-        $sortedGovernorates = [];
-        foreach ($governorateNames as $govName) {
-            if (isset($governoratesArray[$govName])) {
-                $sortedGovernorates[$govName] = $governoratesArray[$govName];
-            }
+            // معالجة المدن لضمان "غير ذلك" في الآخر
+            $governoratesArray[$governorate->name] = OptionsHelper::processOptions($cityNames, false, false);
         }
         
         // تحويل للصيغة المطلوبة للفرونت إند
-        $governorates = collect($sortedGovernorates)->map(function ($cities, $govName) {
+        $governorates = collect($governoratesArray)->map(function ($cities, $govName) {
             return [
                 'name' => $govName,
                 'cities' => collect($cities)->map(function ($cityName) {
@@ -93,37 +67,16 @@ class CategoryFieldsController extends Controller
         if ($supportsMakeModel) {
             $makes = Make::with('models')->get();
             
-            // ✅ معالجة الماركات والموديلات - ترتيب عكسي مع "غير ذلك" في الآخر
+            // معالجة الماركات والموديلات (الترتيب سيتم في الفرونت إند)
             $makesArray = [];
             foreach ($makes as $make) {
-                $makesArray[$make->name] = $make->models->pluck('name')->toArray();
-            }
-            
-            // ترتيب الموديلات داخل كل ماركة عكسياً
-            $makesArray = OptionsHelper::processOptionsMap(
-                $makesArray,
-                $shouldSort = true,
-                $reverseSort = true
-            );
-            
-            // ترتيب أسماء الماركات نفسها عكسياً
-            $makeNames = array_keys($makesArray);
-            $makeNames = OptionsHelper::processOptions(
-                $makeNames,
-                $shouldSort = true,
-                $reverseSort = true
-            );
-            
-            // إعادة ترتيب المصفوفة حسب الماركات المرتبة
-            $sortedMakesArray = [];
-            foreach ($makeNames as $makeName) {
-                if (isset($makesArray[$makeName])) {
-                    $sortedMakesArray[$makeName] = $makesArray[$makeName];
-                }
+                $modelNames = $make->models->pluck('name')->toArray();
+                // معالجة الموديلات لضمان "غير ذلك" في الآخر
+                $makesArray[$make->name] = OptionsHelper::processOptions($modelNames, false, false);
             }
             
             // تحويل للصيغة المطلوبة للفرونت إند
-            $makes = collect($sortedMakesArray)->map(function ($models, $makeName) {
+            $makes = collect($makesArray)->map(function ($models, $makeName) {
                 return [
                     'name' => $makeName,
                     'models' => collect($models)->map(function ($modelName) {
@@ -146,38 +99,16 @@ class CategoryFieldsController extends Controller
                 ->orderBy('sort_order')
                 ->get();
             
-            // ✅ معالجة الأقسام الرئيسية والفرعية - ترتيب عكسي مع "غير ذلك" في الآخر
+            // معالجة الأقسام الرئيسية والفرعية (الترتيب سيتم في الفرونت إند)
             $mainSectionsArray = [];
             foreach ($mainSections as $mainSection) {
                 $subSectionNames = $mainSection->subSections->pluck('name')->toArray();
-                $mainSectionsArray[$mainSection->name] = $subSectionNames;
-            }
-            
-            // ترتيب الأقسام الفرعية داخل كل قسم رئيسي عكسياً
-            $mainSectionsArray = OptionsHelper::processOptionsMap(
-                $mainSectionsArray,
-                $shouldSort = true,
-                $reverseSort = true
-            );
-            
-            // ترتيب أسماء الأقسام الرئيسية نفسها عكسياً
-            $mainSectionNames = array_keys($mainSectionsArray);
-            $mainSectionNames = OptionsHelper::processOptions(
-                $mainSectionNames,
-                $shouldSort = true,
-                $reverseSort = true
-            );
-            
-            // إعادة ترتيب المصفوفة حسب الأقسام الرئيسية المرتبة
-            $sortedMainSections = [];
-            foreach ($mainSectionNames as $mainName) {
-                if (isset($mainSectionsArray[$mainName])) {
-                    $sortedMainSections[$mainName] = $mainSectionsArray[$mainName];
-                }
+                // معالجة الأقسام الفرعية لضمان "غير ذلك" في الآخر
+                $mainSectionsArray[$mainSection->name] = OptionsHelper::processOptions($subSectionNames, false, false);
             }
             
             // تحويل للصيغة المطلوبة للفرونت إند
-            $mainSections = collect($sortedMainSections)->map(function ($subSections, $mainName) {
+            $mainSections = collect($mainSectionsArray)->map(function ($subSections, $mainName) {
                 return [
                     'name' => $mainName,
                     'sub_sections' => collect($subSections)->map(function ($subName) {
@@ -218,12 +149,8 @@ class CategoryFieldsController extends Controller
         if (empty($data['options'])) {
             $data['options'] = [OptionsHelper::OTHER_OPTION];
         } else {
-            // ✅ معالجة مع الترتيب العكسي
-            $data['options'] = OptionsHelper::processOptions(
-                $data['options'],
-                $shouldSort = true,
-                $reverseSort = true
-            );
+            // معالجة لضمان "غير ذلك" في الآخر (بدون ترتيب)
+            $data['options'] = OptionsHelper::processOptions($data['options'], false, false);
         }
 
         $field = CategoryField::create($data);
@@ -261,12 +188,8 @@ class CategoryFieldsController extends Controller
 
             $clean = array_values(array_unique($clean));
             
-            // ✅ استخدام OptionsHelper مع الترتيب العكسي
-            $data['options'] = OptionsHelper::processOptions(
-                $clean,
-                $shouldSort = true,
-                $reverseSort = true
-            );
+            // معالجة لضمان "غير ذلك" في الآخر (بدون ترتيب)
+            $data['options'] = OptionsHelper::processOptions($clean, false, false);
         }
 
         unset($data['field_name']);
