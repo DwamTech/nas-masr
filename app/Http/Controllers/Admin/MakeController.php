@@ -15,13 +15,66 @@ class MakeController extends Controller
 {
     public function index()
     {
-        $items = Make::with('models')->orderBy('name')->get();
-        $items->push((object)[
+        $items = Make::with('models')->get();
+        
+        \Log::info('MakeController::index - Total makes: ' . $items->count());
+        
+        // ✅ معالجة الماركات والموديلات - ترتيب عكسي مع "غير ذلك" في الآخر
+        $makesArray = [];
+        foreach ($items as $make) {
+            $makesArray[$make->id] = [
+                'id' => $make->id,
+                'name' => $make->name,
+                'models' => $make->models->pluck('name')->toArray()
+            ];
+        }
+        
+        \Log::info('MakeController::index - Before sorting: ' . json_encode(array_column($makesArray, 'name')));
+        
+        // ترتيب الموديلات داخل كل ماركة عكسياً
+        foreach ($makesArray as $makeId => $makeData) {
+            $makesArray[$makeId]['models'] = \App\Support\OptionsHelper::processOptions(
+                $makeData['models'],
+                $shouldSort = true,
+                $reverseSort = true
+            );
+        }
+        
+        // ترتيب الماركات نفسها عكسياً حسب الاسم
+        usort($makesArray, function($a, $b) {
+            // استخدام Collator للترتيب العربي
+            $collator = new \Collator('ar');
+            if ($collator === null) {
+                return strcmp($b['name'], $a['name']); // fallback
+            }
+            return $collator->compare($b['name'], $a['name']); // عكسي
+        });
+        
+        \Log::info('MakeController::index - After sorting: ' . json_encode(array_column($makesArray, 'name')));
+        
+        // تحويل الموديلات من array إلى objects
+        foreach ($makesArray as &$makeData) {
+            $makeData['models'] = collect($makeData['models'])->map(function($modelName) use ($makeData) {
+                return (object)[
+                    'name' => $modelName,
+                    'make_id' => $makeData['id']
+                ];
+            })->all();
+        }
+        
+        // إضافة "غير ذلك" في الآخر
+        $makesArray[] = [
             'id' => null,
             'name' => 'غير ذلك',
             'models' => []
-        ]);
-        return response()->json($items);
+        ];
+        
+        // تحويل إلى objects
+        $result = collect($makesArray)->map(function($item) {
+            return (object)$item;
+        });
+        
+        return response()->json($result);
     }
 
     public function addMake(Request $request)
@@ -131,13 +184,27 @@ class MakeController extends Controller
 
     public function models(Make $make)
     {
-        $models = $make->models()->orderBy('name')->get();
-        $models->push((object)[
-            'id' => null,
-            'name' => 'غير ذلك',
-            'make_id' => $make->id
-        ]);
-        return response()->json($models);
+        $models = $make->models()->get();
+        
+        // ✅ ترتيب الموديلات عكسياً
+        $modelNames = $models->pluck('name')->toArray();
+        $modelNames = \App\Support\OptionsHelper::processOptions(
+            $modelNames,
+            $shouldSort = true,
+            $reverseSort = true
+        );
+        
+        // تحويل إلى objects مع الحفاظ على الترتيب
+        $sortedModels = collect($modelNames)->map(function($name) use ($models, $make) {
+            $model = $models->firstWhere('name', $name);
+            return (object)[
+                'id' => $model ? $model->id : null,
+                'name' => $name,
+                'make_id' => $make->id
+            ];
+        });
+        
+        return response()->json($sortedModels);
     }
 
     public function addModel(Request $request, Make $make)
