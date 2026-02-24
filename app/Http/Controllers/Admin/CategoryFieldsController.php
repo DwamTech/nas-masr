@@ -51,6 +51,29 @@ class CategoryFieldsController extends Controller
         $makes = [];
         if ($supportsMakeModel) {
             $makes = Make::with('models')->get();
+            
+            // ✅ معالجة الماركات والموديلات - ترتيب عكسي مع "غير ذلك" في الآخر
+            $makesArray = [];
+            foreach ($makes as $make) {
+                $makesArray[$make->name] = $make->models->pluck('name')->toArray();
+            }
+            
+            // ترتيب الماركات والموديلات عكسياً
+            $makesArray = OptionsHelper::processOptionsMap(
+                $makesArray,
+                $shouldSort = true,
+                $reverseSort = true
+            );
+            
+            // تحويل للصيغة المطلوبة للفرونت إند
+            $makes = collect($makesArray)->map(function ($models, $makeName) {
+                return [
+                    'name' => $makeName,
+                    'models' => collect($models)->map(function ($modelName) {
+                        return ['name' => $modelName];
+                    })->values()->all()
+                ];
+            })->values()->all();
         }
 
         $mainSections = [];
@@ -61,10 +84,34 @@ class CategoryFieldsController extends Controller
                         ->orderBy('sort_order');
                 }
             ])
-                ->where('category_id', $section->id())   // 🟢 بس الكاتيجوري الحالي
+                ->where('category_id', $section->id())
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->get();
+            
+            // ✅ معالجة الأقسام الرئيسية والفرعية - ترتيب عكسي مع "غير ذلك" في الآخر
+            $mainSectionsArray = [];
+            foreach ($mainSections as $mainSection) {
+                $subSectionNames = $mainSection->subSections->pluck('name')->toArray();
+                $mainSectionsArray[$mainSection->name] = $subSectionNames;
+            }
+            
+            // ترتيب الأقسام الرئيسية والفرعية عكسياً
+            $mainSectionsArray = OptionsHelper::processOptionsMap(
+                $mainSectionsArray,
+                $shouldSort = true,
+                $reverseSort = true
+            );
+            
+            // تحويل للصيغة المطلوبة للفرونت إند
+            $mainSections = collect($mainSectionsArray)->map(function ($subSections, $mainName) {
+                return [
+                    'name' => $mainName,
+                    'sub_sections' => collect($subSections)->map(function ($subName) {
+                        return ['name' => $subName];
+                    })->values()->all()
+                ];
+            })->values()->all();
         }
 
         return response()->json([
