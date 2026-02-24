@@ -41,7 +41,48 @@ class CategoryFieldsController extends Controller
             $reverseSort = true      // نعم، ترتيب عكسي
         );
 
+        // ✅ جلب المحافظات مع المدن وترتيبها عكسياً
         $governorates = Governorate::with('cities')->get();
+        
+        // ترتيب المحافظات والمدن عكسياً
+        $governoratesArray = [];
+        foreach ($governorates as $governorate) {
+            $cityNames = $governorate->cities->pluck('name')->toArray();
+            $governoratesArray[$governorate->name] = $cityNames;
+        }
+        
+        // ترتيب المدن داخل كل محافظة عكسياً
+        $governoratesArray = OptionsHelper::processOptionsMap(
+            $governoratesArray,
+            $shouldSort = true,
+            $reverseSort = true
+        );
+        
+        // ترتيب أسماء المحافظات نفسها عكسياً
+        $governorateNames = array_keys($governoratesArray);
+        $governorateNames = OptionsHelper::processOptions(
+            $governorateNames,
+            $shouldSort = true,
+            $reverseSort = true
+        );
+        
+        // إعادة ترتيب المصفوفة حسب المحافظات المرتبة
+        $sortedGovernorates = [];
+        foreach ($governorateNames as $govName) {
+            if (isset($governoratesArray[$govName])) {
+                $sortedGovernorates[$govName] = $governoratesArray[$govName];
+            }
+        }
+        
+        // تحويل للصيغة المطلوبة للفرونت إند
+        $governorates = collect($sortedGovernorates)->map(function ($cities, $govName) {
+            return [
+                'name' => $govName,
+                'cities' => collect($cities)->map(function ($cityName) {
+                    return ['name' => $cityName];
+                })->values()->all()
+            ];
+        })->values()->all();
 
         $section = $slug ? Section::fromSlug($slug) : null;
 
@@ -58,15 +99,31 @@ class CategoryFieldsController extends Controller
                 $makesArray[$make->name] = $make->models->pluck('name')->toArray();
             }
             
-            // ترتيب الماركات والموديلات عكسياً
+            // ترتيب الموديلات داخل كل ماركة عكسياً
             $makesArray = OptionsHelper::processOptionsMap(
                 $makesArray,
                 $shouldSort = true,
                 $reverseSort = true
             );
             
+            // ترتيب أسماء الماركات نفسها عكسياً
+            $makeNames = array_keys($makesArray);
+            $makeNames = OptionsHelper::processOptions(
+                $makeNames,
+                $shouldSort = true,
+                $reverseSort = true
+            );
+            
+            // إعادة ترتيب المصفوفة حسب الماركات المرتبة
+            $sortedMakesArray = [];
+            foreach ($makeNames as $makeName) {
+                if (isset($makesArray[$makeName])) {
+                    $sortedMakesArray[$makeName] = $makesArray[$makeName];
+                }
+            }
+            
             // تحويل للصيغة المطلوبة للفرونت إند
-            $makes = collect($makesArray)->map(function ($models, $makeName) {
+            $makes = collect($sortedMakesArray)->map(function ($models, $makeName) {
                 return [
                     'name' => $makeName,
                     'models' => collect($models)->map(function ($modelName) {
@@ -96,15 +153,31 @@ class CategoryFieldsController extends Controller
                 $mainSectionsArray[$mainSection->name] = $subSectionNames;
             }
             
-            // ترتيب الأقسام الرئيسية والفرعية عكسياً
+            // ترتيب الأقسام الفرعية داخل كل قسم رئيسي عكسياً
             $mainSectionsArray = OptionsHelper::processOptionsMap(
                 $mainSectionsArray,
                 $shouldSort = true,
                 $reverseSort = true
             );
             
+            // ترتيب أسماء الأقسام الرئيسية نفسها عكسياً
+            $mainSectionNames = array_keys($mainSectionsArray);
+            $mainSectionNames = OptionsHelper::processOptions(
+                $mainSectionNames,
+                $shouldSort = true,
+                $reverseSort = true
+            );
+            
+            // إعادة ترتيب المصفوفة حسب الأقسام الرئيسية المرتبة
+            $sortedMainSections = [];
+            foreach ($mainSectionNames as $mainName) {
+                if (isset($mainSectionsArray[$mainName])) {
+                    $sortedMainSections[$mainName] = $mainSectionsArray[$mainName];
+                }
+            }
+            
             // تحويل للصيغة المطلوبة للفرونت إند
-            $mainSections = collect($mainSectionsArray)->map(function ($subSections, $mainName) {
+            $mainSections = collect($sortedMainSections)->map(function ($subSections, $mainName) {
                 return [
                     'name' => $mainName,
                     'sub_sections' => collect($subSections)->map(function ($subName) {
