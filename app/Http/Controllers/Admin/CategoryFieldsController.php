@@ -34,8 +34,12 @@ class CategoryFieldsController extends Controller
 
         $fields = $q->get();
 
-        // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
-        $fields = OptionsHelper::processFieldsCollection($fields);
+        // ✅ استخدام OptionsHelper مع الترتيب العكسي (Z to A)
+        $fields = OptionsHelper::processFieldsCollection(
+            $fields, 
+            $shouldSort = true,      // نعم، نريد ترتيب
+            $reverseSort = true      // نعم، ترتيب عكسي
+        );
 
         $governorates = Governorate::with('cities')->get();
 
@@ -94,7 +98,12 @@ class CategoryFieldsController extends Controller
         if (empty($data['options'])) {
             $data['options'] = [OptionsHelper::OTHER_OPTION];
         } else {
-            $data['options'] = OptionsHelper::processOptions($data['options']);
+            // ✅ معالجة مع الترتيب العكسي
+            $data['options'] = OptionsHelper::processOptions(
+                $data['options'],
+                $shouldSort = true,
+                $reverseSort = true
+            );
         }
 
         $field = CategoryField::create($data);
@@ -132,8 +141,12 @@ class CategoryFieldsController extends Controller
 
             $clean = array_values(array_unique($clean));
             
-            // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
-            $data['options'] = OptionsHelper::processOptions($clean);
+            // ✅ استخدام OptionsHelper مع الترتيب العكسي
+            $data['options'] = OptionsHelper::processOptions(
+                $clean,
+                $shouldSort = true,
+                $reverseSort = true
+            );
         }
 
         unset($data['field_name']);
