@@ -626,16 +626,16 @@ class ListingController extends Controller
 
         $listing->increment('views');
         $viewer = request()->user();
-        if ($viewer->role != 'admin') {
-            if ($viewer && $viewer->id !== $listing->user_id) {
-                $notifications->dispatch(
-                    (int) $listing->user_id,
-                    ' تمت مشاهدة إعلانك',
-                    'قام المستخدم #' . $viewer->id . ' بمشاهدة إعلانك #' . $listing->id . ' في قسم ' . $sec->name,
-                    'view',
-                    ['viewer_id' => (int) $viewer->id, 'listing_id' => (int) $listing->id, 'category_slug' => $sec->slug]
-                );
-            }
+        
+        // Send notification only if viewer is logged in and not admin
+        if ($viewer && $viewer->role != 'admin' && $viewer->id !== $listing->user_id) {
+            $notifications->dispatch(
+                (int) $listing->user_id,
+                ' تمت مشاهدة إعلانك',
+                'قام المستخدم #' . $viewer->id . ' بمشاهدة إعلانك #' . $listing->id . ' في قسم ' . $sec->name,
+                'view',
+                ['viewer_id' => (int) $viewer->id, 'listing_id' => (int) $listing->id, 'category_slug' => $sec->slug]
+            );
         }
 
         $banner = null;
