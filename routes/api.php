@@ -101,13 +101,13 @@ Route::prefix('v1/{section}')->group(function () {
 
     // Route::apiResource('listings', ListingController::class)->only(['index', 'show']);
     Route::get('plans', [PlansController::class, 'show']);
+    
+    // Public route for listing ads (search/browse)
+    Route::get('listings', [ListingController::class, 'index']);
+    Route::get('listings/{listing}', [ListingController::class, 'show']);
 
     Route::middleware('auth:sanctum')->group(function () {
-        Route::get('listings', function(Request $request, string $section) {
-            \Log::info('DEBUG_ROUTE_HIT: section=' . $section . ', query=' . json_encode($request->query()));
-            return app(ListingController::class)->index($section, $request);
-        });
-        Route::apiResource('listings', ListingController::class)->only(['store', 'update', 'destroy', 'show']);
+        Route::apiResource('listings', ListingController::class)->only(['store', 'update', 'destroy']);
     });
 });
 
