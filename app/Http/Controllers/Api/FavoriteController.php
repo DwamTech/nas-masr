@@ -29,6 +29,7 @@ class FavoriteController extends Controller
             return [
                 'plan_type'  => $ad->plan_type,
                 'price'      => $ad->price,
+                'title'      => $ad->title,
                 'description'=> $ad->description,
                 'gov'        => optional($ad->governorate)->name,
                 'cite'       => optional($ad->city)->name,
