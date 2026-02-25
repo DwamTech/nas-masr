@@ -39,6 +39,16 @@ Route::post('/otp/verify', [OtpController::class, 'verify']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::get('v1/test', fn() => response()->json(['ok' => true]));
 
+// Debug route to test if requests are reaching Laravel
+Route::get('debug/test', function() {
+    \Log::info('DEBUG TEST ROUTE HIT');
+    return response()->json([
+        'success' => true,
+        'message' => 'Debug route working',
+        'timestamp' => now()->toIso8601String()
+    ]);
+});
+
 // Public Category Fields Route
 Route::get('category-fields', [CategoryFieldsController::class, 'index']);
 // Public Categories Route

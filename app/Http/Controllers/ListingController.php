@@ -36,7 +36,13 @@ class ListingController extends Controller
 
     public function index(string $section, Request $request)
     {
-        \Log::info('DEBUG_LISTING_INDEX: section=' . $section . ', query_params=' . json_encode($request->query()));
+        \Log::info('=== LISTING INDEX START ===');
+        \Log::info('Section: ' . $section);
+        \Log::info('Query Params: ' . json_encode($request->query()));
+        \Log::info('All Input: ' . json_encode($request->all()));
+        \Log::info('Headers: ' . json_encode($request->headers->all()));
+        \Log::info('Method: ' . $request->method());
+        \Log::info('URL: ' . $request->fullUrl());
         
         Listing::autoExpire();
         $sec = Section::fromSlug($section);
@@ -136,13 +142,20 @@ class ListingController extends Controller
         $attrLike = array_intersect_key($attrLike, array_flip($filterableKeys));
         $q->attrLike($attrLike);
 
-        \Log::info('DEBUG_LISTING_INDEX: About to execute query. Keyword=' . $request->query('q'));
-        \Log::info('DEBUG_LISTING_INDEX: SQL=' . $q->toSql());
-        \Log::info('DEBUG_LISTING_INDEX: Bindings=' . json_encode($q->getBindings()));
+        \Log::info('=== QUERY DETAILS ===');
+        \Log::info('Keyword: ' . $request->query('q'));
+        \Log::info('SQL: ' . $q->toSql());
+        \Log::info('Bindings: ' . json_encode($q->getBindings()));
 
         $rows = $q->get();
         
-        \Log::info('DEBUG_LISTING_INDEX: Results count=' . $rows->count());
+        \Log::info('=== RESULTS ===');
+        \Log::info('Count: ' . $rows->count());
+        if ($rows->count() > 0) {
+            \Log::info('First Result ID: ' . $rows->first()->id);
+            \Log::info('First Result Title: ' . $rows->first()->title);
+        }
+        \Log::info('=== LISTING INDEX END ===');
 
         // زيّدي views لكل النتائج (بالشُحنات)
         // if ($rows->isNotEmpty()) {
