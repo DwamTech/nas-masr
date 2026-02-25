@@ -189,9 +189,9 @@ class Listing extends Model
             $qq->where(function ($q) use ($kw) {
                 $q->whereNotNull('title')
                   ->where('title', '!=', '')
-                  ->whereRaw('REPLACE(REPLACE(REPLACE(title,"أ","ا"),"إ","ا"),"آ","ا") like ?', ["%{$kw}%"]);
+                  ->whereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(title,"أ","ا"),"إ","ا"),"آ","ا"),"ة","ه"),"ى","ي") like ?', ["%{$kw}%"]);
             })
-                ->orWhereRaw('REPLACE(REPLACE(REPLACE(description,"أ","ا"),"إ","ا"),"آ","ا") like ?', ["%{$kw}%"])
+                ->orWhereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(description,"أ","ا"),"إ","ا"),"آ","ا"),"ة","ه"),"ى","ي") like ?', ["%{$kw}%"])
                 ->orWhere('address', 'like', "%{$rawKw}%")
                 ->orWhereHas('governorate', function ($q) use ($rawKw) {
                     $q->where('name', 'like', "%{$rawKw}%");
@@ -409,7 +409,7 @@ class Listing extends Model
     }
 
 
-    protected static function normalizeArabic(?string $text): ?string
+    public static function normalizeArabic(?string $text): ?string
     {
         if ($text === null) {
             return null;

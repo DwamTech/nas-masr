@@ -721,15 +721,18 @@ class ListingController extends Controller
         }
 
         $perPage = (int) $request->query('per_page', 20);
+        
+        // Normalize Arabic keyword for better matching
+        $normalizedKeyword = Listing::normalizeArabic($keyword);
 
         // Build search condition that covers multiple fields
-        $searchCondition = function ($query) use ($keyword) {
-            $query->where(function ($q) use ($keyword) {
+        $searchCondition = function ($query) use ($keyword, $normalizedKeyword) {
+            $query->where(function ($q) use ($normalizedKeyword) {
                 $q->whereNotNull('title')
                   ->where('title', '!=', '')
-                  ->where('title', 'like', "%{$keyword}%");
+                  ->whereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(title,"أ","ا"),"إ","ا"),"آ","ا"),"ة","ه"),"ى","ي") like ?', ["%{$normalizedKeyword}%"]);
             })
-                ->orWhere('description', 'like', "%{$keyword}%")
+                ->orWhereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(description,"أ","ا"),"إ","ا"),"آ","ا"),"ة","ه"),"ى","ي") like ?', ["%{$normalizedKeyword}%"])
                 ->orWhere('address', 'like', "%{$keyword}%")
                 // Search in governorate name
                 ->orWhereHas('governorate', function ($q) use ($keyword) {
