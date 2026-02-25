@@ -166,6 +166,7 @@ class ListingController extends Controller
                 'attributes' => $attrs,
                 'governorate' => ($item->relationLoaded('governorate') && $item->governorate) ? $item->governorate->name : null,
                 'city' => ($item->relationLoaded('city') && $item->city) ? $item->city->name : null,
+                'title' => $item->title,
                 'price' => $item->price,
                 'contact_phone' => $item->contact_phone,
                 'whatsapp_phone' => $item->whatsapp_phone,
