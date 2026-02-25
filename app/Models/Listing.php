@@ -188,6 +188,7 @@ class Listing extends Model
         return $q->where(function ($qq) use ($kw, $rawKw) {
             $qq->where(function ($q) use ($kw) {
                 $q->whereNotNull('title')
+                  ->where('title', '!=', '')
                   ->whereRaw('REPLACE(REPLACE(REPLACE(title,"أ","ا"),"إ","ا"),"آ","ا") like ?', ["%{$kw}%"]);
             })
                 ->orWhereRaw('REPLACE(REPLACE(REPLACE(description,"أ","ا"),"إ","ا"),"آ","ا") like ?', ["%{$kw}%"])
