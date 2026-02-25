@@ -99,23 +99,41 @@ class CategoryFieldsController extends Controller
                 ->orderBy('sort_order')
                 ->get();
             
-            // معالجة الأقسام الرئيسية والفرعية (الترتيب سيتم في الفرونت إند)
-            $mainSectionsArray = [];
-            foreach ($mainSections as $mainSection) {
-                $subSectionNames = $mainSection->subSections->pluck('name')->toArray();
+            // تحويل للصيغة المطلوبة للفرونت إند مع الـ IDs
+            $mainSections = $mainSections->map(function ($mainSection) {
+                $subSections = $mainSection->subSections->map(function ($subSection) {
+                    return [
+                        'id' => $subSection->id,
+                        'name' => $subSection->name,
+                        'title' => $subSection->title,
+                    ];
+                })->values();
+                
                 // معالجة الأقسام الفرعية لضمان "غير ذلك" في الآخر
-                $mainSectionsArray[$mainSection->name] = OptionsHelper::processOptions($subSectionNames, false, false);
-            }
-            
-            // تحويل للصيغة المطلوبة للفرونت إند
-            $mainSections = collect($mainSectionsArray)->map(function ($subSections, $mainName) {
+                $subSectionNames = $subSections->pluck('name')->toArray();
+                $processedNames = OptionsHelper::processOptions($subSectionNames, false, false);
+                
+                // إعادة ترتيب الأقسام الفرعية حسب الترتيب المعالج
+                $orderedSubSections = collect($processedNames)->map(function ($name) use ($subSections) {
+                    return $subSections->firstWhere('name', $name);
+                })->filter()->values();
+                
                 return [
-                    'name' => $mainName,
-                    'sub_sections' => collect($subSections)->map(function ($subName) {
-                        return ['name' => $subName];
-                    })->values()->all()
+                    'id' => $mainSection->id,
+                    'name' => $mainSection->name,
+                    'title' => $mainSection->title,
+                    'sub_sections' => $orderedSubSections->all()
                 ];
-            })->values()->all();
+            })->values();
+            
+            // معالجة الأقسام الرئيسية لضمان "غير ذلك" في الآخر
+            $mainSectionNames = $mainSections->pluck('name')->toArray();
+            $processedMainNames = OptionsHelper::processOptions($mainSectionNames, false, false);
+            
+            // إعادة ترتيب الأقسام الرئيسية حسب الترتيب المعالج
+            $mainSections = collect($processedMainNames)->map(function ($name) use ($mainSections) {
+                return $mainSections->firstWhere('name', $name);
+            })->filter()->values()->all();
         }
 
         return response()->json([
