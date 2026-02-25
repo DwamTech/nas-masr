@@ -704,7 +704,11 @@ class ListingController extends Controller
 
         // Build search condition that covers multiple fields
         $searchCondition = function ($query) use ($keyword) {
-            $query->where('title', 'like', "%{$keyword}%")
+            $query->where(function ($q) use ($keyword) {
+                $q->whereNotNull('title')
+                  ->where('title', '!=', '')
+                  ->where('title', 'like', "%{$keyword}%");
+            })
                 ->orWhere('description', 'like', "%{$keyword}%")
                 ->orWhere('address', 'like', "%{$keyword}%")
                 // Search in governorate name
