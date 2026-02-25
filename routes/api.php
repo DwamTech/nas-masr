@@ -103,7 +103,11 @@ Route::prefix('v1/{section}')->group(function () {
     Route::get('plans', [PlansController::class, 'show']);
 
     Route::middleware('auth:sanctum')->group(function () {
-        Route::apiResource('listings', ListingController::class)->only(['store', 'update', 'destroy', 'index', 'show']);
+        Route::get('listings', function(Request $request, string $section) {
+            \Log::info('DEBUG_ROUTE_HIT: section=' . $section . ', query=' . json_encode($request->query()));
+            return app(ListingController::class)->index($section, $request);
+        });
+        Route::apiResource('listings', ListingController::class)->only(['store', 'update', 'destroy', 'show']);
     });
 });
 

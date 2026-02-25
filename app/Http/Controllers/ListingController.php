@@ -36,6 +36,8 @@ class ListingController extends Controller
 
     public function index(string $section, Request $request)
     {
+        \Log::info('DEBUG_LISTING_INDEX: section=' . $section . ', query_params=' . json_encode($request->query()));
+        
         Listing::autoExpire();
         $sec = Section::fromSlug($section);
         $typesByKey = Listing::typesByKeyForSection($sec);
@@ -134,8 +136,13 @@ class ListingController extends Controller
         $attrLike = array_intersect_key($attrLike, array_flip($filterableKeys));
         $q->attrLike($attrLike);
 
+        \Log::info('DEBUG_LISTING_INDEX: About to execute query. Keyword=' . $request->query('q'));
+        \Log::info('DEBUG_LISTING_INDEX: SQL=' . $q->toSql());
+        \Log::info('DEBUG_LISTING_INDEX: Bindings=' . json_encode($q->getBindings()));
 
         $rows = $q->get();
+        
+        \Log::info('DEBUG_LISTING_INDEX: Results count=' . $rows->count());
 
         // زيّدي views لكل النتائج (بالشُحنات)
         // if ($rows->isNotEmpty()) {
