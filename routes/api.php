@@ -49,6 +49,64 @@ Route::get('debug/test', function() {
     ]);
 });
 
+// TEMPORARY: Debug referral code issue - REMOVE AFTER DEBUGGING
+Route::get('debug/referral-codes', function() {
+    $data = [];
+    
+    // 1. Check representatives
+    $representatives = \App\Models\User::where('role', 'representative')->orderBy('id')->get();
+    $data['representatives'] = $representatives->map(fn($r) => [
+        'id' => $r->id,
+        'name' => $r->name,
+        'phone' => $r->phone,
+        'role' => $r->role,
+    ]);
+    
+    // 2. Check specific IDs
+    foreach ([8, 30] as $id) {
+        $user = \App\Models\User::find($id);
+        $found = \App\Models\User::where('id', $id)->where('role', 'representative')->first();
+        $data["user_id_$id"] = [
+            'exists' => $user ? true : false,
+            'name' => $user->name ?? null,
+            'role' => $user->role ?? null,
+            'is_representative' => $user && $user->role === 'representative',
+            'query_finds_it' => $found ? true : false,
+        ];
+    }
+    
+    // 3. Users with referral codes
+    foreach (['8', '30'] as $code) {
+        $users = \App\Models\User::where('referral_code', $code)->get();
+        $data["referral_code_$code"] = [
+            'count' => $users->count(),
+            'users' => $users->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'phone' => $u->phone]),
+        ];
+    }
+    
+    // 4. Check for padding issues
+    $usersWithReferral = \App\Models\User::whereNotNull('referral_code')->take(10)->get();
+    $data['padding_check'] = $usersWithReferral->map(fn($u) => [
+        'id' => $u->id,
+        'referral_code' => $u->referral_code,
+        'length' => strlen($u->referral_code),
+        'has_padding' => $u->referral_code !== trim($u->referral_code),
+    ]);
+    
+    // 5. Test queries
+    $data['query_tests'] = [];
+    foreach (['8', '30', ' 8', '8 '] as $testCode) {
+        $result = \App\Models\User::where('id', $testCode)->where('role', 'representative')->first();
+        $data['query_tests'][] = [
+            'test_code' => $testCode,
+            'length' => strlen($testCode),
+            'found' => $result ? true : false,
+        ];
+    }
+    
+    return response()->json($data);
+});
+
 // Public Category Fields Route
 Route::get('category-fields', [CategoryFieldsController::class, 'index']);
 // Public Categories Route
