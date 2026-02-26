@@ -462,6 +462,7 @@ class UserController extends Controller
             ->select([
                 'listings.id',
                 'listings.category_id',
+                'listings.title',  // ✅ إضافة title
                 'listings.main_image',
                 'listings.make_id',
                 'listings.model_id',
@@ -531,6 +532,7 @@ class UserController extends Controller
                 'attributes' => $attrs,
                 'governorate' => $govName,
                 'city' => $cityName,
+                'title' => $row->title,  // ✅ إضافة title
                 'price' => $row->price,
                 'contact_phone' => $row->contact_phone,
                 'whatsapp_phone' => $row->whatsapp_phone,
