@@ -229,6 +229,30 @@ class BestAdvertiserController extends Controller
             ]
         ], $ba->wasRecentlyCreated ? 201 : 200);
     }
+    public function show($userId)
+    {
+        $bestAdvertiser = BestAdvertiser::where('user_id', $userId)->first();
+
+        if (!$bestAdvertiser) {
+            return response()->json([
+                'message' => 'Best advertiser not found',
+                'data' => null
+            ], 404);
+        }
+
+        $categories = Category::whereIn('id', $bestAdvertiser->category_ids)->get(['id', 'name', 'slug']);
+
+        return response()->json([
+            'data' => [
+                'id' => $bestAdvertiser->id,
+                'user_id' => $bestAdvertiser->user_id,
+                'category_ids' => $bestAdvertiser->category_ids,
+                'is_active' => $bestAdvertiser->is_active,
+                'categories' => $categories,
+            ]
+        ]);
+    }
+
 
 
 
