@@ -39,6 +39,7 @@ class User extends Authenticatable
         'otp',
         'otp_verified_at',
         'role',
+        'is_representative',
         'fcm_token',
     ];
 
@@ -65,6 +66,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'otp_verified' => 'boolean',
             'receive_external_notif' => 'boolean',
+            'is_representative' => 'boolean',
         ];
     }
 
@@ -138,6 +140,22 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is a representative (delegate).
+     */
+    public function isRepresentative(): bool
+    {
+        return $this->is_representative === true;
+    }
+
+    /**
+     * Check if user is an advertiser.
+     */
+    public function isAdvertiser(): bool
+    {
+        return $this->role === 'advertiser';
     }
 }
 

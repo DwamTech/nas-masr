@@ -77,8 +77,9 @@ class UserController extends Controller
             }
 
             // Check if referral_code is a valid user ID who is a representative
+            // UPDATED: Now checks is_representative flag instead of role
             $delegateUser = User::where('id', $validated['referral_code'])
-                ->where('role', 'representative')
+                ->where('is_representative', true)
                 ->first();
 
             if (!$delegateUser) {
