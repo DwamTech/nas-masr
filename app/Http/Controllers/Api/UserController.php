@@ -459,10 +459,9 @@ class UserController extends Controller
             ->where('listings.user_id', $user->id)
             ->when($statusFilter, fn($q) => $q->where('listings.status', $statusFilter))
             ->when(!empty($slugs), fn($q) => $q->whereIn('categories.slug', $slugs))
-            $query->select([
+            ->select([
                 'listings.id',
                 'listings.category_id',
-                'listings.title',  // ✅ إضافة title
                 'listings.main_image',
                 'listings.make_id',
                 'listings.model_id',
@@ -543,7 +542,6 @@ class UserController extends Controller
                 'lng' => $row->lng,
                 'rank' => $row->rank,
                 'views' => $row->views,
-                'title' => $row->title,  // ✅ إضافة title
 
                 // الكاتيجري
                 'category' => $catSlug,
