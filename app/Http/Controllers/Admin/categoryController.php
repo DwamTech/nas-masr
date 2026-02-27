@@ -155,6 +155,10 @@ class categoryController extends Controller
                 ],
             ]);
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Re-throw validation exceptions to let Laravel handle them
+            throw $e;
+
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'success' => false,
