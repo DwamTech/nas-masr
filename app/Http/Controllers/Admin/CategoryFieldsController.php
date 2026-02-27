@@ -284,6 +284,9 @@ class CategoryFieldsController extends Controller
             
             // معالجة لضمان "غير ذلك" في الآخر (بدون ترتيب)
             $data['options'] = OptionsHelper::processOptions($clean, false, false);
+            
+            // Update ranks for the new options
+            $this->updateRanksForOptions($categorySlug, $data['field_name'], $data['options']);
         }
 
         unset($data['field_name']);
@@ -368,5 +371,54 @@ class CategoryFieldsController extends Controller
         }
         
         return $result;
+    }
+
+    /**
+     * Update ranks for options when they are modified.
+     * This ensures new options get proper ranks and maintains order.
+     *
+     * @param string $categorySlug
+     * @param string $fieldName
+     * @param array $options
+     * @return void
+     */
+    private function updateRanksForOptions(string $categorySlug, string $fieldName, array $options): void
+    {
+        $category = Category::where('slug', $categorySlug)->first();
+        
+        if (!$category) {
+            return;
+        }
+
+        // Get existing ranks
+        $existingRanks = CategoryFieldOptionRank::where('category_id', $category->id)
+            ->where('field_name', $fieldName)
+            ->get()
+            ->keyBy('option_value');
+
+        // Assign ranks to options
+        $rank = 1;
+        foreach ($options as $option) {
+            // If option already has a rank, keep it
+            if (isset($existingRanks[$option])) {
+                $existingRanks[$option]->update(['rank' => $rank]);
+            } else {
+                // New option - create rank
+                CategoryFieldOptionRank::create([
+                    'category_id' => $category->id,
+                    'field_name' => $fieldName,
+                    'option_value' => $option,
+                    'rank' => $rank,
+                ]);
+            }
+            $rank++;
+        }
+
+        // Delete ranks for options that no longer exist
+        $optionValues = array_values($options);
+        CategoryFieldOptionRank::where('category_id', $category->id)
+            ->where('field_name', $fieldName)
+            ->whereNotIn('option_value', $optionValues)
+            ->delete();
     }
 }
