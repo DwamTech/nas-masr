@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\StoreCategoryFieldRequest;
 use App\Http\Requests\Admin\UpdateCategoryFieldRequest;
 use App\Models\Category;
 use App\Models\CategoryField;
+use App\Models\CategoryFieldOptionRank;
 use App\Models\Governorate;
 use App\Models\Make;
 use App\Support\Section;
@@ -34,6 +35,21 @@ class CategoryFieldsController extends Controller
 
         $fields = $q->get();
 
+        // Sort options by rank if ranks exist
+        $category = $slug ? Category::where('slug', $slug)->first() : null;
+        if ($category) {
+            $fields = $fields->map(function ($field) use ($category) {
+                if (!empty($field->options) && is_array($field->options)) {
+                    $field->options = $this->sortOptionsByRank(
+                        $category->id,
+                        $field->field_name,
+                        $field->options
+                    );
+                }
+                return $field;
+            });
+        }
+
         // معالجة الحقول لضمان "غير ذلك" في الآخر (بدون ترتيب - سيتم الترتيب في الفرونت إند)
         $fields = OptionsHelper::processFieldsCollection($fields, false, false);
 
@@ -44,15 +60,35 @@ class CategoryFieldsController extends Controller
         $governoratesArray = [];
         foreach ($governorates as $governorate) {
             $cityNames = $governorate->cities->pluck('name')->toArray();
+            
+            // Sort cities by rank if ranks exist
+            if ($category) {
+                $cityNames = $this->sortOptionsByRank(
+                    $category->id,
+                    "City_{$governorate->name}",
+                    $cityNames
+                );
+            }
+            
             // معالجة المدن لضمان "غير ذلك" في الآخر
             $governoratesArray[$governorate->name] = OptionsHelper::processOptions($cityNames, false, false);
         }
         
+        // Sort governorates by rank if ranks exist
+        $governorateNames = array_keys($governoratesArray);
+        if ($category) {
+            $governorateNames = $this->sortOptionsByRank(
+                $category->id,
+                'Governorate',
+                $governorateNames
+            );
+        }
+        
         // تحويل للصيغة المطلوبة للفرونت إند
-        $governorates = collect($governoratesArray)->map(function ($cities, $govName) {
+        $governorates = collect($governorateNames)->map(function ($govName) use ($governoratesArray) {
             return [
                 'name' => $govName,
-                'cities' => collect($cities)->map(function ($cityName) {
+                'cities' => collect($governoratesArray[$govName])->map(function ($cityName) {
                     return ['name' => $cityName];
                 })->values()->all()
             ];
@@ -71,15 +107,35 @@ class CategoryFieldsController extends Controller
             $makesArray = [];
             foreach ($makes as $make) {
                 $modelNames = $make->models->pluck('name')->toArray();
+                
+                // Sort models by rank if ranks exist
+                if ($category) {
+                    $modelNames = $this->sortOptionsByRank(
+                        $category->id,
+                        "Model_{$make->name}",
+                        $modelNames
+                    );
+                }
+                
                 // معالجة الموديلات لضمان "غير ذلك" في الآخر
                 $makesArray[$make->name] = OptionsHelper::processOptions($modelNames, false, false);
             }
             
+            // Sort makes by rank if ranks exist
+            $makeNames = array_keys($makesArray);
+            if ($category) {
+                $makeNames = $this->sortOptionsByRank(
+                    $category->id,
+                    'Brand',
+                    $makeNames
+                );
+            }
+            
             // تحويل للصيغة المطلوبة للفرونت إند
-            $makes = collect($makesArray)->map(function ($models, $makeName) {
+            $makes = collect($makeNames)->map(function ($makeName) use ($makesArray) {
                 return [
                     'name' => $makeName,
-                    'models' => collect($models)->map(function ($modelName) {
+                    'models' => collect($makesArray[$makeName])->map(function ($modelName) {
                         return ['name' => $modelName];
                     })->values()->all()
                 ];
@@ -100,7 +156,7 @@ class CategoryFieldsController extends Controller
                 ->get();
             
             // تحويل للصيغة المطلوبة للفرونت إند مع الـ IDs
-            $mainSections = $mainSections->map(function ($mainSection) {
+            $mainSections = $mainSections->map(function ($mainSection) use ($category) {
                 $subSections = $mainSection->subSections->map(function ($subSection) {
                     return [
                         'id' => $subSection->id,
@@ -111,6 +167,16 @@ class CategoryFieldsController extends Controller
                 
                 // معالجة الأقسام الفرعية لضمان "غير ذلك" في الآخر
                 $subSectionNames = $subSections->pluck('name')->toArray();
+                
+                // Sort sub-sections by rank if ranks exist
+                if ($category) {
+                    $subSectionNames = $this->sortOptionsByRank(
+                        $category->id,
+                        "SubSection_{$mainSection->name}",
+                        $subSectionNames
+                    );
+                }
+                
                 $processedNames = OptionsHelper::processOptions($subSectionNames, false, false);
                 
                 // إعادة ترتيب الأقسام الفرعية حسب الترتيب المعالج
@@ -128,6 +194,16 @@ class CategoryFieldsController extends Controller
             
             // معالجة الأقسام الرئيسية لضمان "غير ذلك" في الآخر
             $mainSectionNames = $mainSections->pluck('name')->toArray();
+            
+            // Sort main sections by rank if ranks exist
+            if ($category) {
+                $mainSectionNames = $this->sortOptionsByRank(
+                    $category->id,
+                    'MainSection',
+                    $mainSectionNames
+                );
+            }
+            
             $processedMainNames = OptionsHelper::processOptions($mainSectionNames, false, false);
             
             // إعادة ترتيب الأقسام الرئيسية حسب الترتيب المعالج
@@ -228,5 +304,59 @@ class CategoryFieldsController extends Controller
         return response()->json([
             'message' => 'تم إلغاء تفعيل الحقل',
         ]);
+    }
+
+    /**
+     * Sort options by their rank values.
+     * If no ranks exist, return options in original order (backward compatibility).
+     *
+     * @param int $categoryId
+     * @param string $fieldName
+     * @param array $options
+     * @return array
+     */
+    private function sortOptionsByRank(int $categoryId, string $fieldName, array $options): array
+    {
+        // Get ranks for this field
+        $ranks = CategoryFieldOptionRank::where('category_id', $categoryId)
+            ->where('field_name', $fieldName)
+            ->get()
+            ->keyBy('option_value');
+
+        // If no ranks exist, return original order (backward compatibility)
+        if ($ranks->isEmpty()) {
+            return $options;
+        }
+
+        // Create a map of option => rank
+        $rankMap = [];
+        foreach ($ranks as $rank) {
+            $rankMap[$rank->option_value] = $rank->rank;
+        }
+
+        // Separate options with ranks and without ranks
+        $withRanks = [];
+        $withoutRanks = [];
+
+        foreach ($options as $option) {
+            if (isset($rankMap[$option])) {
+                $withRanks[] = ['option' => $option, 'rank' => $rankMap[$option]];
+            } else {
+                $withoutRanks[] = $option;
+            }
+        }
+
+        // Sort options with ranks by rank value
+        usort($withRanks, function ($a, $b) {
+            return $a['rank'] <=> $b['rank'];
+        });
+
+        // Extract just the option values
+        $sortedWithRanks = array_map(function ($item) {
+            return $item['option'];
+        }, $withRanks);
+
+        // Combine: ranked options first, then unranked options (backward compatibility)
+        return array_merge($sortedWithRanks, $withoutRanks);
     }
 }
