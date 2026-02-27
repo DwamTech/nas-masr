@@ -138,6 +138,9 @@ Route::prefix('admin')
         //all categories for admin
         Route::get('categories', [categoryController::class, 'index']);
         Route::get('categories/{category}', [categoryController::class, 'show']);
+        
+        // Category Option Ranks Route
+        Route::post('categories/{slug}/options/ranks', [CategoryController::class, 'updateOptionRanks']);
 
         // System Settings Routes
         // Route::apiResource('system-settings', SystemSettingController::class);

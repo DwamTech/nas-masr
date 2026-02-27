@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\categoryRequest;
 use App\Http\Resources\Admin\CategoryResource;
 use App\Models\Category;
+use App\Services\OptionRankService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class categoryController extends Controller
 {
@@ -110,5 +112,66 @@ class categoryController extends Controller
                 ];
             }),
         ]);
+    }
+
+    /**
+     * Update option ranks for a category field.
+     * 
+     * POST /api/admin/categories/{slug}/options/ranks
+     * 
+     * @param Request $request
+     * @param string $slug
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateOptionRanks(Request $request, string $slug)
+    {
+        try {
+            // Validate request
+            $validated = $request->validate([
+                'field' => 'required|string|max:255',
+                'ranks' => 'required|array|min:1',
+                'ranks.*.option' => 'required|string',
+                'ranks.*.rank' => 'required|integer|min:1',
+            ]);
+
+            // Check if category exists
+            $category = Category::where('slug', $slug)->first();
+            if (!$category) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'القسم غير موجود',
+                ], 404);
+            }
+
+            // Use service to update ranks
+            $service = new OptionRankService();
+            $service->updateRanks($slug, $validated['field'], $validated['ranks']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تحديث الترتيب بنجاح',
+                'data' => [
+                    'updated_count' => count($validated['ranks']),
+                ],
+            ]);
+
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to update option ranks', [
+                'category' => $slug,
+                'field' => $validated['field'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'حدث خطأ في حفظ الترتيب',
+            ], 500);
+        }
     }
 }
