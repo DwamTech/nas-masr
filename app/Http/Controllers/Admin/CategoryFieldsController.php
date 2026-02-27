@@ -334,12 +334,15 @@ class CategoryFieldsController extends Controller
             $rankMap[$rank->option_value] = $rank->rank;
         }
 
-        // Separate options with ranks and without ranks
+        // Separate "غير ذلك", options with ranks, and options without ranks
+        $otherOption = null;
         $withRanks = [];
         $withoutRanks = [];
 
         foreach ($options as $option) {
-            if (isset($rankMap[$option])) {
+            if ($option === 'غير ذلك') {
+                $otherOption = $option;
+            } elseif (isset($rankMap[$option])) {
                 $withRanks[] = ['option' => $option, 'rank' => $rankMap[$option]];
             } else {
                 $withoutRanks[] = $option;
@@ -356,7 +359,14 @@ class CategoryFieldsController extends Controller
             return $item['option'];
         }, $withRanks);
 
-        // Combine: ranked options first, then unranked options (backward compatibility)
-        return array_merge($sortedWithRanks, $withoutRanks);
+        // Combine: ranked options first, then unranked options, then "غير ذلك" at the end
+        $result = array_merge($sortedWithRanks, $withoutRanks);
+        
+        // Add "غير ذلك" at the end if it exists
+        if ($otherOption !== null) {
+            $result[] = $otherOption;
+        }
+        
+        return $result;
     }
 }
