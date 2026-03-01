@@ -16,38 +16,40 @@ class MakeController extends Controller
 {
     public function index()
     {
+        // Get category ID for cars
+        $carsCategory = \App\Models\Category::where('slug', 'cars')->first();
+        $carsCategoryId = $carsCategory ? $carsCategory->id : null;
+        
         // Get makes with their models, sorted by rank
-        $items = Make::with(['models' => function ($query) {
+        $items = Make::with(['models' => function ($query) use ($carsCategoryId) {
             // Sort models by rank (from category_field_option_ranks table)
-            $query->leftJoin('category_field_option_ranks', function ($join) {
-                $join->on('car_models.name', '=', 'category_field_option_ranks.option_value')
-                     ->where('category_field_option_ranks.field_name', '=', 'model')
-                     ->whereExists(function ($query) {
-                         $query->select(\DB::raw(1))
-                               ->from('categories')
-                               ->whereColumn('categories.id', 'category_field_option_ranks.category_id')
-                               ->where('categories.slug', 'cars');
-                     });
-            })
-            ->select('car_models.*')
-            ->orderByRaw('COALESCE(category_field_option_ranks.rank, 999999) ASC');
+            if ($carsCategoryId) {
+                $query->leftJoin('category_field_option_ranks', function ($join) use ($carsCategoryId) {
+                    $join->on('car_models.name', '=', 'category_field_option_ranks.option_value')
+                         ->where('category_field_option_ranks.field_name', '=', 'model')
+                         ->where('category_field_option_ranks.category_id', '=', $carsCategoryId);
+                })
+                ->select('car_models.*')
+                ->orderByRaw('COALESCE(category_field_option_ranks.rank, 999999) ASC');
+            } else {
+                $query->orderBy('car_models.name', 'asc');
+            }
         }])
         // Sort makes by rank
-        ->leftJoin('category_field_option_ranks', function ($join) {
-            $join->on('makes.name', '=', 'category_field_option_ranks.option_value')
-                 ->where('category_field_option_ranks.field_name', '=', 'brand')
-                 ->whereExists(function ($query) {
-                     $query->select(\DB::raw(1))
-                           ->from('categories')
-                           ->whereColumn('categories.id', 'category_field_option_ranks.category_id')
-                           ->where('categories.slug', 'cars');
-                 });
+        ->when($carsCategoryId, function ($query) use ($carsCategoryId) {
+            $query->leftJoin('category_field_option_ranks', function ($join) use ($carsCategoryId) {
+                $join->on('makes.name', '=', 'category_field_option_ranks.option_value')
+                     ->where('category_field_option_ranks.field_name', '=', 'brand')
+                     ->where('category_field_option_ranks.category_id', '=', $carsCategoryId);
+            })
+            ->select('makes.*')
+            ->orderByRaw('COALESCE(category_field_option_ranks.rank, 999999) ASC');
+        }, function ($query) {
+            $query->orderBy('makes.name', 'asc');
         })
-        ->select('makes.*')
-        ->orderByRaw('COALESCE(category_field_option_ranks.rank, 999999) ASC')
         ->get();
         
-        // معالجة الماركات والموديلات (الترتيب سيتم في الفرونت إند)
+        // معالجة الماركات والموديلات
         $makesArray = [];
         foreach ($items as $make) {
             $modelNames = $make->models->pluck('name')->toArray();
