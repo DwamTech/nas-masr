@@ -8,6 +8,7 @@ use App\Models\Make;
 use App\Models\CarModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 
@@ -15,19 +16,47 @@ class MakeController extends Controller
 {
     public function index()
     {
-        $items = Make::with('models')->get();
+        // Get makes with their models, sorted by rank
+        $items = Make::with(['models' => function ($query) {
+            // Sort models by rank (from category_field_option_ranks table)
+            $query->leftJoin('category_field_option_ranks', function ($join) {
+                $join->on('car_models.name', '=', 'category_field_option_ranks.option_value')
+                     ->where('category_field_option_ranks.field_name', '=', 'model')
+                     ->whereExists(function ($query) {
+                         $query->select(\DB::raw(1))
+                               ->from('categories')
+                               ->whereColumn('categories.id', 'category_field_option_ranks.category_id')
+                               ->where('categories.slug', 'cars');
+                     });
+            })
+            ->select('car_models.*')
+            ->orderByRaw('COALESCE(category_field_option_ranks.rank, 999999) ASC');
+        }])
+        // Sort makes by rank
+        ->leftJoin('category_field_option_ranks', function ($join) {
+            $join->on('makes.name', '=', 'category_field_option_ranks.option_value')
+                 ->where('category_field_option_ranks.field_name', '=', 'brand')
+                 ->whereExists(function ($query) {
+                     $query->select(\DB::raw(1))
+                           ->from('categories')
+                           ->whereColumn('categories.id', 'category_field_option_ranks.category_id')
+                           ->where('categories.slug', 'cars');
+                 });
+        })
+        ->select('makes.*')
+        ->orderByRaw('COALESCE(category_field_option_ranks.rank, 999999) ASC')
+        ->get();
         
         // معالجة الماركات والموديلات (الترتيب سيتم في الفرونت إند)
         $makesArray = [];
         foreach ($items as $make) {
             $modelNames = $make->models->pluck('name')->toArray();
-            // معالجة الموديلات لضمان "غير ذلك" في الآخر
-            $processedModels = \App\Support\OptionsHelper::processOptions($modelNames, false, false);
+            // لا نعيد الترتيب - نحافظ على ترتيب الـ query
             
             $makesArray[] = [
                 'id' => $make->id,
                 'name' => $make->name,
-                'models' => collect($processedModels)->map(function($modelName) use ($make) {
+                'models' => collect($modelNames)->map(function($modelName) use ($make) {
                     return (object)[
                         'name' => $modelName,
                         'make_id' => $make->id
