@@ -94,6 +94,9 @@ class BestAdvertiserController extends Controller
                 $lSec = $listing->category_id ? Section::fromId($listing->category_id) : null;
                 $catSlug = $lSec?->slug ?? null;
                 $catName = $lSec?->name ?? null;
+                
+                // Get category model for unified image fields
+                $category = $listing->category_id ? Category::find($listing->category_id) : null;
 
                 $byUser[$row->user_id][] = [
                     'main_image_url' => ($section === 'jobs' || $section === 'doctors' || $section === 'teachers')
@@ -112,6 +115,11 @@ class BestAdvertiserController extends Controller
                     // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
                     'category'       => $catSlug,
                     'category_name'  => $catName,
+                    
+                    // Unified category image fields
+                    'is_global_image_active' => $category->is_global_image_active ?? false,
+                    'global_image_url' => $category->global_image_url,
+                    'global_image_full_url' => $category->global_image_full_url,
                 ];
             }
         }
