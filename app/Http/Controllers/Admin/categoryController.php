@@ -268,12 +268,37 @@ class categoryController extends Controller
         DB::beginTransaction();
 
         try {
+            // Set memory limit for image processing to prevent memory exhaustion
+            $originalMemoryLimit = ini_get('memory_limit');
+            ini_set('memory_limit', '256M');
+
             // Validation
             $validated = $request->validate([
                 'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
             ]);
 
             $uploadedFile = $validated['image'];
+            
+            // Security: Path Traversal Prevention
+            // Sanitize the original filename to prevent path traversal attacks
+            $originalFilename = basename($uploadedFile->getClientOriginalName());
+            $originalFilename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $originalFilename);
+            
+            // Verify the filename doesn't contain path traversal sequences
+            if (strpos($originalFilename, '..') !== false || 
+                strpos($originalFilename, '/') !== false || 
+                strpos($originalFilename, '\\') !== false) {
+                Log::warning('Path traversal attempt detected', [
+                    'category_id' => $category->id,
+                    'filename' => $uploadedFile->getClientOriginalName(),
+                    'user_id' => auth()->id(),
+                    'ip' => $request->ip(),
+                ]);
+
+                return response()->json([
+                    'error' => 'اسم الملف غير صالح',
+                ], 422);
+            }
             
             // Validation 1: Verify file format (JPEG, PNG, WebP)
             $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
@@ -333,6 +358,48 @@ class categoryController extends Controller
                 return response()->json([
                     'error' => 'الملف ليس صورة صالحة',
                 ], 422);
+            }
+
+            // Security: Image Bomb Protection
+            // Check decompressed size estimate to prevent decompression bombs
+            $imageInfo = @getimagesize($uploadedFile->getRealPath());
+            if ($imageInfo) {
+                $width = $imageInfo[0];
+                $height = $imageInfo[1];
+                
+                // Estimate decompressed size (width * height * 4 bytes for RGBA)
+                $estimatedDecompressedSize = $width * $height * 4;
+                $maxDecompressedSize = 100 * 1024 * 1024; // 100MB
+                
+                if ($estimatedDecompressedSize > $maxDecompressedSize) {
+                    Log::warning('Image bomb detected - decompressed size too large', [
+                        'category_id' => $category->id,
+                        'width' => $width,
+                        'height' => $height,
+                        'estimated_size' => $estimatedDecompressedSize,
+                        'max_size' => $maxDecompressedSize,
+                        'user_id' => auth()->id(),
+                        'ip' => $request->ip(),
+                    ]);
+
+                    return response()->json([
+                        'error' => 'أبعاد الصورة كبيرة جداً. الحد الأقصى المسموح: 5000x5000 بكسل',
+                    ], 422);
+                }
+                
+                // Additional check: reject images with extreme dimensions
+                if ($width > 5000 || $height > 5000) {
+                    Log::warning('Image dimensions exceed maximum', [
+                        'category_id' => $category->id,
+                        'width' => $width,
+                        'height' => $height,
+                        'user_id' => auth()->id(),
+                    ]);
+
+                    return response()->json([
+                        'error' => 'أبعاد الصورة تتجاوز الحد الأقصى المسموح (5000x5000 بكسل)',
+                    ], 422);
+                }
             }
 
             // Create image resource from uploaded file
@@ -416,6 +483,27 @@ class categoryController extends Controller
             $filename = "{$category->id}_{$timestamp}.webp";
             $path = "uploads/categories/global/{$filename}";
             $fullPath = storage_path('app/public/' . $path);
+
+            // Security: Verify path is within allowed directory (additional path traversal check)
+            $realPath = realpath(dirname($fullPath));
+            $allowedBase = realpath(storage_path('app/public/uploads/categories/global'));
+            
+            if ($realPath === false || $allowedBase === false || strpos($realPath, $allowedBase) !== 0) {
+                Log::error('Path traversal attempt detected in storage path', [
+                    'category_id' => $category->id,
+                    'path' => $path,
+                    'full_path' => $fullPath,
+                    'user_id' => auth()->id(),
+                    'ip' => $request->ip(),
+                ]);
+
+                imagedestroy($sourceImage);
+                imagedestroy($resizedImage);
+
+                return response()->json([
+                    'error' => 'مسار التخزين غير صالح',
+                ], 500);
+            }
 
             // Create directory if it doesn't exist
             $directory = dirname($fullPath);
@@ -505,6 +593,9 @@ class categoryController extends Controller
             // Commit transaction
             DB::commit();
 
+            // Restore original memory limit
+            ini_set('memory_limit', $originalMemoryLimit);
+
             // Log success
             Log::info('Unified image uploaded successfully', [
                 'category_id' => $category->id,
@@ -533,12 +624,22 @@ class categoryController extends Controller
             // Rollback transaction
             DB::rollBack();
 
+            // Restore original memory limit
+            if (isset($originalMemoryLimit)) {
+                ini_set('memory_limit', $originalMemoryLimit);
+            }
+
             // Re-throw validation exceptions to let Laravel handle them
             throw $e;
 
         } catch (\Exception $e) {
             // Rollback transaction
             DB::rollBack();
+
+            // Restore original memory limit
+            if (isset($originalMemoryLimit)) {
+                ini_set('memory_limit', $originalMemoryLimit);
+            }
 
             // Delete uploaded file if it exists
             if (isset($fullPath) && file_exists($fullPath)) {
