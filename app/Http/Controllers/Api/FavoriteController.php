@@ -26,6 +26,9 @@ class FavoriteController extends Controller
 
             $slug = $ad->category_id ? Section::fromId($ad->category_id)->slug : null;
             $sec = $ad->category_id ? Section::fromId($ad->category_id) : null;
+            
+            // Get category model for unified image fields
+            $cat = $ad->category_id ? \App\Models\Category::find($ad->category_id) : null;
 
             return [
                 'plan_type'  => $ad->plan_type,
@@ -43,9 +46,9 @@ class FavoriteController extends Controller
                 'categry_name'=> $slug ? Section::fromId($ad->category_id)->name : null,
                 
                 // Unified category image fields
-                'is_global_image_active' => $sec ? ($sec->is_global_image_active ?? false) : false,
-                'global_image_url' => $sec ? $sec->global_image_url : null,
-                'global_image_full_url' => $sec ? $sec->global_image_full_url : null,
+                'is_global_image_active' => $cat ? ($cat->is_global_image_active ?? false) : false,
+                'global_image_url' => $cat ? $cat->global_image_url : null,
+                'global_image_full_url' => $cat ? $cat->global_image_full_url : null,
             ];
         })->filter();
 
