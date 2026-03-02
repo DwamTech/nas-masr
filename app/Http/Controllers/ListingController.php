@@ -174,7 +174,7 @@ class ListingController extends Controller
         $categoryName = $sec->name;
 
 
-        $items = $rows->map(function ($item) use ($supportsMakeModel, $supportsSections, $categorySlug, $categoryName) {
+        $items = $rows->map(function ($item) use ($supportsMakeModel, $supportsSections, $categorySlug, $categoryName, $sec) {
             $attrs = [];
             if ($item->relationLoaded('attributes')) {
                 foreach ($item->attributes as $row) {
