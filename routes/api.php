@@ -126,6 +126,7 @@ Route::prefix('admin')
     ->middleware(['auth:sanctum', 'admin'])
     ->group(function () {
         // Category Fields Routes
+        Route::get('category-fields', [CategoryFieldsController::class, 'index']);
         Route::post('category-fields', [CategoryFieldsController::class, 'store']);
         Route::post('category-fields/{categoryField}', [CategoryFieldsController::class, 'update']);
         Route::delete('category-fields/{categoryField}', [CategoryFieldsController::class, 'destroy']);
