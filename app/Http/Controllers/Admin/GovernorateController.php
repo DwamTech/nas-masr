@@ -11,7 +11,7 @@ class GovernorateController extends Controller
 {
     public function index()
     {
-        $items = Governorate::with('cities')->orderBy('name')->get();
+        $items = Governorate::with('cities')->orderBy('sort_order')->orderBy('name')->get();
         $items->push((object)[
             'id' => null,
             'name' => 'غير ذلك',
@@ -85,7 +85,7 @@ class GovernorateController extends Controller
 
     public function cities(Governorate $governorate)
     {
-        $cities = $governorate->cities()->orderBy('name')->get();
+        $cities = $governorate->cities()->orderBy('sort_order')->orderBy('name')->get();
         $cities->push((object)[
             'id' => null,
             'name' => 'غير ذلك',
@@ -137,6 +137,38 @@ class GovernorateController extends Controller
             'success' => true,
             'message' => 'تم حذف المدينة بنجاح.',
         ], 200);
+    }
+
+    // POST /api/admin/governorates/ranks
+    public function updateGovRanks(Request $request)
+    {
+        $data = $request->validate([
+            'ranks' => 'required|array',
+            'ranks.*.id' => 'required|integer|exists:governorates,id',
+            'ranks.*.rank' => 'required|integer|min:0',
+        ]);
+
+        foreach ($data['ranks'] as $item) {
+            Governorate::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
+        }
+
+        return response()->json(['message' => 'تم تحديث ترتيب المحافظات بنجاح']);
+    }
+
+    // POST /api/admin/cities/ranks
+    public function updateCityRanks(Request $request)
+    {
+        $data = $request->validate([
+            'ranks' => 'required|array',
+            'ranks.*.id' => 'required|integer|exists:cities,id',
+            'ranks.*.rank' => 'required|integer|min:0',
+        ]);
+
+        foreach ($data['ranks'] as $item) {
+            City::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
+        }
+
+        return response()->json(['message' => 'تم تحديث ترتيب المدن بنجاح']);
     }
 
     /**

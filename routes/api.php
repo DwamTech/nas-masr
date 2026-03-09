@@ -195,6 +195,8 @@ Route::prefix('admin')
 
 
 
+        Route::post('governorates/ranks', [GovernorateController::class, 'updateGovRanks']);
+        Route::post('cities/ranks', [GovernorateController::class, 'updateCityRanks']);
         Route::post('governorates', [GovernorateController::class, 'storeGov']);
         Route::post('/city/{governorate}', [GovernorateController::class, 'storCities']);
         Route::put('governorates/{governorate}', [GovernorateController::class, 'updateGov']);

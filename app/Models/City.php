@@ -10,7 +10,7 @@ class City extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'governorate_id'];
+    protected $fillable = ['name', 'governorate_id', 'sort_order'];
 
     public function governorate()
     {
