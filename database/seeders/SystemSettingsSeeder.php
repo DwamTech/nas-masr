@@ -120,6 +120,23 @@ class SystemSettingsSeeder extends Seeder
         );
 
         DB::table('system_settings')->updateOrInsert(
+            ['key' => 'payment_inquiries_number'],
+            [
+                'value'       => '',
+                'type'        => 'string',
+                'group'       => 'general',
+                'label'       => 'رقم استفسارات الدفع',
+                'meta'        => json_encode([
+                    'placeholder' => '+20 ...',
+                    'icon' => 'whatsapp'
+                ]),
+                'autoload'    => true,
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ]
+        );
+
+        DB::table('system_settings')->updateOrInsert(
             ['key' => 'facebook'],
             [
                 'value'       => '',
