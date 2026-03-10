@@ -50,6 +50,7 @@ class BannerController extends Controller
         'missing',
         'home_ads',
         'home',
+        'payment_single_ad_methods',
         'unified' // fallback
     ];
 
