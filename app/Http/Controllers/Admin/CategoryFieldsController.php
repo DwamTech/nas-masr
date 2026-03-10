@@ -53,44 +53,37 @@ class CategoryFieldsController extends Controller
         // معالجة الحقول لضمان "غير ذلك" في الآخر (بدون ترتيب - سيتم الترتيب في الفرونت إند)
         $fields = OptionsHelper::processFieldsCollection($fields, false, false);
 
-        // جلب المحافظات مع المدن
-        $governorates = Governorate::with('cities')->get();
-        
-        // تحويل للصيغة المطلوبة (الترتيب سيتم في الفرونت إند)
-        $governoratesArray = [];
-        foreach ($governorates as $governorate) {
-            $cityNames = $governorate->cities->pluck('name')->toArray();
-            
-            // Sort cities by rank if ranks exist
-            if ($category) {
-                $cityNames = $this->sortOptionsByRank(
-                    $category->id,
-                    "City_{$governorate->name}",
-                    $cityNames
-                );
+        // جلب المحافظات والمدن بنفس ترتيب الداشبورد (sort_order ثم الاسم)
+        // ملاحظة: لا نستخدم category_field_option_ranks هنا حتى يكون التطبيق مطابقًا تمامًا للداشبورد.
+        $governorates = Governorate::with([
+            'cities' => function ($q) {
+                $q->orderBy('sort_order')->orderBy('name');
             }
-            
-            // معالجة المدن لضمان "غير ذلك" في الآخر
-            $governoratesArray[$governorate->name] = OptionsHelper::processOptions($cityNames, false, false);
-        }
-        
-        // Sort governorates by rank if ranks exist
-        $governorateNames = array_keys($governoratesArray);
-        if ($category) {
-            $governorateNames = $this->sortOptionsByRank(
-                $category->id,
-                'Governorate',
-                $governorateNames
-            );
-        }
-        
-        // تحويل للصيغة المطلوبة للفرونت إند
-        $governorates = collect($governorateNames)->map(function ($govName) use ($governoratesArray) {
+        ])->orderBy('sort_order')->orderBy('name')->get();
+
+        // تحويل للصيغة المطلوبة للفرونت مع إرجاع id/rank لثبات التطابق
+        $governorates = $governorates->map(function ($governorate) {
+            $cityNames = $governorate->cities->pluck('name')->toArray();
+            $orderedCityNames = OptionsHelper::processOptions($cityNames, false, false);
+
+            $citiesByName = $governorate->cities->keyBy('name');
+            $cities = collect($orderedCityNames)->map(function ($cityName) use ($citiesByName) {
+                $city = $citiesByName->get($cityName);
+                if (!$city) {
+                    return null;
+                }
+                return [
+                    'id' => $city->id,
+                    'name' => $city->name,
+                    'rank' => $city->sort_order,
+                ];
+            })->filter()->values()->all();
+
             return [
-                'name' => $govName,
-                'cities' => collect($governoratesArray[$govName])->map(function ($cityName) {
-                    return ['name' => $cityName];
-                })->values()->all()
+                'id' => $governorate->id,
+                'name' => $governorate->name,
+                'rank' => $governorate->sort_order,
+                'cities' => $cities,
             ];
         })->values()->all();
 
