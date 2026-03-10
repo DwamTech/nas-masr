@@ -14,6 +14,8 @@ class SystemSettingController extends Controller
         'privacy_policy',
         'terms_conditions-main_',
         'sub_support_number',
+        'instapay_number',
+        'vodafone_cash_number',
         'emergency_number',
         'facebook',
         'twitter',
@@ -44,6 +46,8 @@ class SystemSettingController extends Controller
         return [
             'support_number'        => ['nullable', 'string', 'max:255'],
             'sub_support_number'    => ['nullable', 'string', 'max:255'],
+            'instapay_number'       => ['nullable', 'string', 'max:255'],
+            'vodafone_cash_number'  => ['nullable', 'string', 'max:255'],
             'emergency_number'      => ['nullable', 'string', 'max:255'],
             'panner_image'          => ['nullable', 'string', 'max:1024'],
             'privacy_policy'        => ['nullable', 'string'],
