@@ -635,72 +635,117 @@ class ListingController extends Controller
         $listing->increment('views');
         // This route is public; resolve token-authenticated user explicitly.
         $viewer = $request->user('api') ?? $request->user();
-        
-        // Send notification only if viewer is logged in and not admin
+
+        // Send notification after the HTTP response to avoid delaying ad details load.
         if ($viewer && $viewer->role != 'admin' && $viewer->id !== $listing->user_id) {
-            $notifications->dispatch(
+            $this->dispatchViewNotificationAfterResponse(
+                $notifications,
                 (int) $listing->user_id,
-                ' تمت مشاهدة إعلانك',
-                'قام المستخدم #' . $viewer->id . ' بمشاهدة إعلانك #' . $listing->id . ' في قسم ' . $sec->name,
-                'view',
-                ['viewer_id' => (int) $viewer->id, 'listing_id' => (int) $listing->id, 'category_slug' => $sec->slug]
+                (int) $viewer->id,
+                (int) $listing->id,
+                (string) $sec->name,
+                (string) $sec->slug
             );
         }
 
-        $banner = null;
         $slug = $sec->slug;
+        $banner = $this->resolveCategoryBannerPath($slug);
 
-        // 1. Try to find banner from DB for this category
-        $catBanner = CategoryBanner::where('slug', $slug)->where('is_active', true)->first();
-        if ($catBanner) {
-            $banner = $catBanner->banner_path;
-        }
-
-        // 2. Fallback to unified if not found
-        if (!$banner) {
-            $unifiedBanner = CategoryBanner::where('slug', 'unified')->where('is_active', true)->first();
-            if ($unifiedBanner) {
-                $banner = $unifiedBanner->banner_path;
-            }
-        }
-
-        // 3. Last resort fallback (FileSystem check for legacy support or if DB is empty)
-        if (!$banner) {
-            $unifiedPath = public_path("storage/uploads/banner/unified");
-            if (File::isDirectory($unifiedPath)) {
-                $files = File::files($unifiedPath);
-                if (count($files) > 0) {
-                    $banner = "storage/uploads/banner/unified/" . $files[0]->getFilename();
-                }
-            }
-        }
-
-        $owner = User::select('id', 'name', 'created_at')->find($listing->user_id);
-        $adsCount = Listing::where('user_id', $listing->user_id)->count();
+        $owner = User::query()
+            ->select('id', 'name', 'created_at')
+            ->withCount('listings')
+            ->find($listing->user_id);
 
         $userPayload = [
             'id' => $owner?->id,
             'name' => $owner?->name ?? "advertiser",
             'joined_at' => $owner?->created_at?->toIso8601String(),
             'joined_at_human' => $owner?->created_at?->diffForHumans(),
-            'listings_count' => $adsCount,
+            'listings_count' => (int) ($owner?->listings_count ?? 0),
             'banner' => $banner
         ];
 
+        $with = ['attributes', 'governorate', 'city'];
+        if ($sec->supportsMakeModel()) {
+            $with[] = 'make';
+            $with[] = 'model';
+        }
+        if ($sec->supportsSections()) {
+            $with[] = 'mainSection';
+            $with[] = 'subSection';
+        }
 
         return (new ListingResource(
-            $listing->load([
-                'attributes',
-                'governorate',
-                'city',
-                'make',
-                'model',
-                'mainSection',
-                'subSection',
-            ])
+            $listing->load($with)
         ))->additional([
             'user' => $userPayload,
         ]);
+    }
+
+    protected function dispatchViewNotificationAfterResponse(
+        NotificationService $notifications,
+        int $ownerId,
+        int $viewerId,
+        int $listingId,
+        string $sectionName,
+        string $sectionSlug
+    ): void {
+        app()->terminating(function () use ($notifications, $ownerId, $viewerId, $listingId, $sectionName, $sectionSlug) {
+            try {
+                $notifications->dispatch(
+                    $ownerId,
+                    ' تمت مشاهدة إعلانك',
+                    'قام المستخدم #' . $viewerId . ' بمشاهدة إعلانك #' . $listingId . ' في قسم ' . $sectionName,
+                    'view',
+                    [
+                        'viewer_id' => $viewerId,
+                        'listing_id' => $listingId,
+                        'category_slug' => $sectionSlug,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning('view_notification_after_response_failed', [
+                    'listing_id' => $listingId,
+                    'owner_id' => $ownerId,
+                    'viewer_id' => $viewerId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
+
+    protected function resolveCategoryBannerPath(string $slug): ?string
+    {
+        return Cache::remember("category_banner_path:{$slug}", now()->addMinutes(10), function () use ($slug) {
+            // 1) Category-specific banner from DB
+            $catBanner = CategoryBanner::query()
+                ->where('slug', $slug)
+                ->where('is_active', true)
+                ->value('banner_path');
+            if (!empty($catBanner)) {
+                return $catBanner;
+            }
+
+            // 2) Unified fallback from DB
+            $unifiedBanner = CategoryBanner::query()
+                ->where('slug', 'unified')
+                ->where('is_active', true)
+                ->value('banner_path');
+            if (!empty($unifiedBanner)) {
+                return $unifiedBanner;
+            }
+
+            // 3) Legacy filesystem fallback
+            $unifiedPath = public_path('storage/uploads/banner/unified');
+            if (File::isDirectory($unifiedPath)) {
+                $files = File::files($unifiedPath);
+                if (!empty($files)) {
+                    return 'storage/uploads/banner/unified/' . $files[0]->getFilename();
+                }
+            }
+
+            return null;
+        });
     }
 
     public function trackContactClick(string $section, Listing $listing, Request $request): \Illuminate\Http\JsonResponse
