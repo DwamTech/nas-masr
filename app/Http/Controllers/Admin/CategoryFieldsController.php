@@ -151,7 +151,7 @@ class CategoryFieldsController extends Controller
             if ($category) {
                 $makeNames = $this->sortOptionsByRankWithFallbackFields(
                     $category->id,
-                    ['brand', 'Brand'],
+                    ['brand', 'Brand', 'make', 'Make', 'car_make', 'CarMake'],
                     $makeNames
                 );
             }

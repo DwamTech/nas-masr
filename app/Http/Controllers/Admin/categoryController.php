@@ -157,12 +157,18 @@ class categoryController extends Controller
             $service = new OptionRankService();
             $service->updateRanks($slug, $resolvedFieldName, $validated['ranks']);
 
+            // Keep automotive make/model ranks synchronized across related categories.
+            if ($this->shouldSyncAutomotiveRanks($resolvedFieldName)) {
+                $this->syncAutomotiveRanks($slug, $resolvedFieldName, $validated['ranks'], $service);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'تم تحديث الترتيب بنجاح',
                 'data' => [
                     'updated_count' => count($validated['ranks']),
                     'field' => $resolvedFieldName,
+                    'synced_automotive' => $this->shouldSyncAutomotiveRanks($resolvedFieldName),
                 ],
             ]);
 
@@ -200,14 +206,24 @@ class categoryController extends Controller
      */
     private function resolveRankFieldName(string $fieldName, ?string $parentId): string
     {
-        $field = trim($fieldName);
+        $field = strtolower(trim($fieldName));
         $parent = trim((string) $parentId);
+
+        // Canonical key for make/brand across categories.
+        if (in_array($field, ['make', 'brand', 'car_make'], true)) {
+            return 'brand';
+        }
+
+        // Canonical key for main sections in categories using main/sub sections.
+        if ($field === 'main_section') {
+            return 'MainSection';
+        }
 
         if ($parent === '') {
             return $field;
         }
 
-        if (strtolower($field) === 'model') {
+        if ($field === 'model') {
             $makeId = $this->resolveMakeIdFromParent($parent);
             if ($makeId !== null) {
                 // Canonical key for per-make model ranks
@@ -216,6 +232,11 @@ class categoryController extends Controller
 
             // Fallback for compatibility when make cannot be resolved
             return "model_" . $this->normalizeRankToken($parent);
+        }
+
+        // Canonical per-main-section key for sub section ranks.
+        if ($field === 'sub_section') {
+            return "SubSection_{$parent}";
         }
 
         return $field;
@@ -264,6 +285,49 @@ class categoryController extends Controller
             return '';
         }
         return strtolower($v);
+    }
+
+    /**
+     * Determine if rank key should be synchronized across automotive categories.
+     *
+     * @param string $resolvedFieldName
+     * @return bool
+     */
+    private function shouldSyncAutomotiveRanks(string $resolvedFieldName): bool
+    {
+        return $resolvedFieldName === 'brand'
+            || str_starts_with($resolvedFieldName, 'model_make_id_')
+            || str_starts_with($resolvedFieldName, 'model_');
+    }
+
+    /**
+     * Sync make/model ranks across cars, car rent, and spare-parts categories.
+     *
+     * @param string $sourceSlug
+     * @param string $resolvedFieldName
+     * @param array<int, array{option:string, rank:int}> $ranks
+     * @param OptionRankService $service
+     * @return void
+     */
+    private function syncAutomotiveRanks(string $sourceSlug, string $resolvedFieldName, array $ranks, OptionRankService $service): void
+    {
+        $automotiveSlugs = ['cars', 'cars_rent', 'spare-parts'];
+        foreach ($automotiveSlugs as $targetSlug) {
+            if ($targetSlug === $sourceSlug) {
+                continue;
+            }
+
+            try {
+                $service->updateRanks($targetSlug, $resolvedFieldName, $ranks);
+            } catch (\Throwable $e) {
+                Log::warning('automotive_rank_sync_failed', [
+                    'source_slug' => $sourceSlug,
+                    'target_slug' => $targetSlug,
+                    'field' => $resolvedFieldName,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
