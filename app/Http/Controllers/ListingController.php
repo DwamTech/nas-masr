@@ -627,13 +627,14 @@ class ListingController extends Controller
         }
     }
 
-    public function show(string $section, Listing $listing, NotificationService $notifications)
+    public function show(string $section, Listing $listing, NotificationService $notifications, Request $request)
     {
         $sec = Section::fromSlug($section);
         abort_if($listing->category_id !== $sec->id(), 404);
 
         $listing->increment('views');
-        $viewer = request()->user();
+        // This route is public; resolve token-authenticated user explicitly.
+        $viewer = $request->user('api') ?? $request->user();
         
         // Send notification only if viewer is logged in and not admin
         if ($viewer && $viewer->role != 'admin' && $viewer->id !== $listing->user_id) {

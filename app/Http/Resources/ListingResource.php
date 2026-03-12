@@ -67,7 +67,8 @@ class ListingResource extends JsonResource
             ? $this->subSection->name
             : null;
 
-        $viewer = $request->user();
+        // For public endpoints, resolve API token guard explicitly.
+        $viewer = $request->user('api') ?? $request->user();
         $canViewClickMetrics = $viewer
             && (($viewer->role ?? null) === 'admin' || (int) $viewer->id === (int) $this->user_id);
 
