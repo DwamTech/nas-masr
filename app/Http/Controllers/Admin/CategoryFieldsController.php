@@ -20,6 +20,13 @@ use App\Models\CategorySubSection;
 
 class CategoryFieldsController extends Controller
 {
+    /**
+     * Request-level cache for ranks map.
+     *
+     * @var array<string, array<string, int>>
+     */
+    private array $fieldRankMapCache = [];
+
     // GET /api/admin/category-fields?category_slug=cars
     public function index(Request $request)
     {
@@ -103,9 +110,15 @@ class CategoryFieldsController extends Controller
                 
                 // Sort models by rank if ranks exist
                 if ($category) {
-                    $modelNames = $this->sortOptionsByRank(
+                    $modelNames = $this->sortOptionsByRankWithFallbackFields(
                         $category->id,
-                        "Model_{$make->name}",
+                        [
+                            "model_{$make->name}",
+                            "Model_{$make->name}",
+                            "model::{$make->name}",
+                            'model',
+                            'Model',
+                        ],
                         $modelNames
                     );
                 }
@@ -117,9 +130,9 @@ class CategoryFieldsController extends Controller
             // Sort makes by rank if ranks exist
             $makeNames = array_keys($makesArray);
             if ($category) {
-                $makeNames = $this->sortOptionsByRank(
+                $makeNames = $this->sortOptionsByRankWithFallbackFields(
                     $category->id,
-                    'Brand',
+                    ['brand', 'Brand'],
                     $makeNames
                 );
             }
@@ -313,23 +326,71 @@ class CategoryFieldsController extends Controller
      */
     private function sortOptionsByRank(int $categoryId, string $fieldName, array $options): array
     {
-        // Get ranks for this field
-        $ranks = CategoryFieldOptionRank::where('category_id', $categoryId)
-            ->where('field_name', $fieldName)
-            ->get()
-            ->keyBy('option_value');
-
-        // If no ranks exist, return original order (backward compatibility)
-        if ($ranks->isEmpty()) {
+        $rankMap = $this->getRankMap($categoryId, $fieldName);
+        if (empty($rankMap)) {
             return $options;
         }
 
-        // Create a map of option => rank
-        $rankMap = [];
-        foreach ($ranks as $rank) {
-            $rankMap[$rank->option_value] = $rank->rank;
+        return $this->sortOptionsByExplicitRankMap($options, $rankMap);
+    }
+
+    /**
+     * Try multiple rank field names and use the first one that has data.
+     * This keeps backward compatibility with old and new key formats.
+     *
+     * @param int $categoryId
+     * @param array<int, string> $fieldNames
+     * @param array $options
+     * @return array
+     */
+    private function sortOptionsByRankWithFallbackFields(int $categoryId, array $fieldNames, array $options): array
+    {
+        foreach ($fieldNames as $fieldName) {
+            $key = trim((string) $fieldName);
+            if ($key === '') {
+                continue;
+            }
+            $rankMap = $this->getRankMap($categoryId, $key);
+            if (!empty($rankMap)) {
+                return $this->sortOptionsByExplicitRankMap($options, $rankMap);
+            }
         }
 
+        return $options;
+    }
+
+    /**
+     * Resolve rank map with per-request caching.
+     *
+     * @param int $categoryId
+     * @param string $fieldName
+     * @return array<string, int>
+     */
+    private function getRankMap(int $categoryId, string $fieldName): array
+    {
+        $cacheKey = $categoryId . '|' . $fieldName;
+        if (array_key_exists($cacheKey, $this->fieldRankMapCache)) {
+            return $this->fieldRankMapCache[$cacheKey];
+        }
+
+        $rankMap = CategoryFieldOptionRank::where('category_id', $categoryId)
+            ->where('field_name', $fieldName)
+            ->pluck('rank', 'option_value')
+            ->toArray();
+
+        $this->fieldRankMapCache[$cacheKey] = $rankMap;
+        return $rankMap;
+    }
+
+    /**
+     * Sort options with a preloaded rank map.
+     *
+     * @param array $options
+     * @param array<string, int> $rankMap
+     * @return array
+     */
+    private function sortOptionsByExplicitRankMap(array $options, array $rankMap): array
+    {
         // Separate "غير ذلك", options with ranks, and options without ranks
         $otherOption = null;
         $withRanks = [];

@@ -135,6 +135,7 @@ class categoryController extends Controller
                 'ranks' => 'required|array|min:1',
                 'ranks.*.option' => 'required|string',
                 'ranks.*.rank' => 'required|integer|min:1',
+                'parentId' => 'nullable|string|max:255',
             ]);
 
             // Check if category exists
@@ -146,15 +147,21 @@ class categoryController extends Controller
                 ], 404);
             }
 
+            $resolvedFieldName = $this->resolveRankFieldName(
+                $validated['field'],
+                $validated['parentId'] ?? null
+            );
+
             // Use service to update ranks
             $service = new OptionRankService();
-            $service->updateRanks($slug, $validated['field'], $validated['ranks']);
+            $service->updateRanks($slug, $resolvedFieldName, $validated['ranks']);
 
             return response()->json([
                 'success' => true,
                 'message' => 'تم تحديث الترتيب بنجاح',
                 'data' => [
                     'updated_count' => count($validated['ranks']),
+                    'field' => $resolvedFieldName,
                 ],
             ]);
 
@@ -180,6 +187,30 @@ class categoryController extends Controller
                 'message' => 'حدث خطأ في حفظ الترتيب',
             ], 500);
         }
+    }
+
+    /**
+     * Resolve the storage key for option ranks.
+     * For model ranks with parent context, persist per-make key.
+     *
+     * @param string $fieldName
+     * @param string|null $parentId
+     * @return string
+     */
+    private function resolveRankFieldName(string $fieldName, ?string $parentId): string
+    {
+        $field = trim($fieldName);
+        $parent = trim((string) $parentId);
+
+        if ($parent === '') {
+            return $field;
+        }
+
+        if (strtolower($field) === 'model') {
+            return "model_{$parent}";
+        }
+
+        return $field;
     }
 
     /**
