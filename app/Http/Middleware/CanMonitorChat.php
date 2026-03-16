@@ -26,12 +26,12 @@ class CanMonitorChat
             ], 401);
         }
 
-        // Must be admin
-        if (!$user->isAdmin()) {
+        // Admins always allowed. Employees may access when the page key is assigned.
+        if (!$user->isAdmin() && !$user->hasDashboardPage('customer-chats.index')) {
             $this->logUnauthorizedAccess($user, 'not_admin');
             
             return response()->json([
-                'message' => 'غير مصرح - يجب أن تكون مسؤول',
+                'message' => 'غير مصرح - ليست لديك صلاحية مراقبة المحادثات',
             ], 403);
         }
 

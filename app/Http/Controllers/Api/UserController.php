@@ -409,6 +409,8 @@ class UserController extends Controller
     //Admin control
     public function blockedUser(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         if ($user->status === 'blocked') {
             $user->update([
                 'status' => 'active'
@@ -448,6 +450,8 @@ class UserController extends Controller
     // Admin: Show user with listings combined
     public function showUserWithListings(User $user, Request $request)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         $user->loadCount('listings');
         $viewer = $request->user();
         $canViewClickMetrics = $viewer
@@ -649,25 +653,68 @@ class UserController extends Controller
         return json_last_error() === JSON_ERROR_NONE ? $x : $json;
     }
 
+    private function actorIsAdmin(Request $request): bool
+    {
+        $actor = $request->user();
+
+        return $actor ? $actor->isAdmin() : false;
+    }
+
+    private function ensureCanManageStaffAccounts(
+        Request $request,
+        ?User $targetUser = null,
+        ?string $requestedRole = null,
+        bool $touchesDashboardPages = false
+    ): void {
+        if ($this->actorIsAdmin($request)) {
+            return;
+        }
+
+        $requestedRole = is_string($requestedRole) ? trim($requestedRole) : null;
+        $isProtectedTarget = $targetUser?->isPrivilegedDashboardRole() ?? false;
+        $isProtectedRequestedRole = $requestedRole !== null
+            && in_array($requestedRole, User::privilegedDashboardRoles(), true);
+
+        if ($isProtectedTarget || $isProtectedRequestedRole || $touchesDashboardPages) {
+            abort(response()->json([
+                'message' => 'غير مصرح لك بإدارة حسابات فريق الداشبورد أو صلاحياتهم.',
+            ], 403));
+        }
+    }
+
 
     // Admin: Create user
     public function storeUser(Request $request)
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:15', 'unique:users,phone'],
-            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer'])],
+            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer', 'employee'])],
             'status' => ['nullable', Rule::in(['active', 'blocked'])],
             'referral_code' => ['nullable', 'string', 'max:20'],
+            'allowed_dashboard_pages' => ['nullable', 'array'],
+            'allowed_dashboard_pages.*' => ['string', Rule::in(array_keys(config('dashboard_permissions', [])))],
             'password' => ['nullable', 'string', 'min:4', 'max:100'],
         ]);
 
+        $this->ensureCanManageStaffAccounts(
+            $request,
+            null,
+            $data['role'] ?? null,
+            array_key_exists('allowed_dashboard_pages', $data)
+        );
+
         $user = new User();
         $user->name = $data['name'] ?? ($data['phone'] ?? 'User');
+        $user->email = $data['email'] ?? null;
         $user->phone = $data['phone'];
         $user->role = $data['role'] ?? 'user';
         $user->status = $data['status'] ?? 'active';
         $user->referral_code = $data['referral_code'] ?? null;
+        $user->allowed_dashboard_pages = ($user->role ?? null) === 'employee'
+            ? array_values(array_unique($data['allowed_dashboard_pages'] ?? []))
+            : [];
         $user->password = Hash::make($data['password'] ?? '123456');
         $user->save();
 
@@ -684,17 +731,34 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:15', Rule::unique('users', 'phone')->ignore($user->id)],
-            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer'])],
+            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer', 'employee'])],
             'status' => ['nullable', Rule::in(['active', 'blocked'])],
             'referral_code' => ['nullable', 'string', 'max:20'],
+            'allowed_dashboard_pages' => ['nullable', 'array'],
+            'allowed_dashboard_pages.*' => ['string', Rule::in(array_keys(config('dashboard_permissions', [])))],
         ]);
 
-        foreach (['name', 'phone', 'role', 'status', 'referral_code'] as $field) {
+        $this->ensureCanManageStaffAccounts(
+            $request,
+            $user,
+            $data['role'] ?? $user->role,
+            array_key_exists('allowed_dashboard_pages', $data)
+        );
+
+        foreach (['name', 'email', 'phone', 'role', 'status', 'referral_code'] as $field) {
             if (array_key_exists($field, $data)) {
                 $user->{$field} = $data[$field];
             }
         }
+
+        if (array_key_exists('allowed_dashboard_pages', $data) || ($data['role'] ?? $user->role) !== 'employee') {
+            $user->allowed_dashboard_pages = ($data['role'] ?? $user->role) === 'employee'
+                ? array_values(array_unique($data['allowed_dashboard_pages'] ?? []))
+                : [];
+        }
+
         $user->save();
 
         $user->loadCount('listings');
@@ -705,8 +769,10 @@ class UserController extends Controller
     }
 
     // Admin: Delete user
-    public function deleteUser(User $user)
+    public function deleteUser(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         // revoke tokens then delete
         $user->tokens()->delete();
         $user->delete();
@@ -723,6 +789,7 @@ class UserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'phone' => $user->phone,
+            'email' => $user->email,
             'user_code' => (string) $user->id,
             'delegate_code' => $user->referral_code,
             'status' => $user->status ?? 'active',
@@ -731,6 +798,8 @@ class UserController extends Controller
             'whatsapp_clicks' => $totals['whatsapp_clicks'],
             'call_clicks' => $totals['call_clicks'],
             'role' => $user->role ?? 'user',
+            'allowed_dashboard_pages' => $user->dashboardPageKeys(),
+            'profile_image_url' => $user->profile_image_url,
         ];
     }
 
@@ -850,8 +919,10 @@ class UserController extends Controller
 
 
     //create admin otp
-    public function createOtp(User $user)
+    public function createOtp(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         // $user = Request()->user();
         // if ($user->role == 'advertiser' || $user->role == 'user' || $user->role == 'representative'){
 
@@ -1010,8 +1081,10 @@ class UserController extends Controller
      * Admin: Get all clients for a specific representative.
      * GET /api/admin/delegates/{user}/clients
      */
-    public function delegateClients(User $user)
+    public function delegateClients(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         // Find the client relationship record for this user (representative)
         $userClient = UserClient::where('user_id', $user->id)->first();
 

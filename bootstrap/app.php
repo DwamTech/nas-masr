@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\CanMonitorChat;
+use App\Http\Middleware\DashboardAccessMiddleware;
+use App\Http\Middleware\DashboardPageMiddleware;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register middleware aliases
         $middleware->alias([
             'admin' => AdminMiddleware::class,
+            'dashboard.access' => DashboardAccessMiddleware::class,
+            'dashboard.page' => DashboardPageMiddleware::class,
             'can.monitor.chat' => CanMonitorChat::class,
         ]);
 

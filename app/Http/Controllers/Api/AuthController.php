@@ -108,8 +108,16 @@ class AuthController extends Controller
 
 
     // admin change  password
-    public function changePass(User $user)
+    public function changePass(Request $request, User $user)
     {
+        $actor = $request->user();
+
+        if ($actor && !$actor->isAdmin() && $user->isPrivilegedDashboardRole()) {
+            return response()->json([
+                'message' => 'غير مصرح لك بتعديل حسابات فريق الداشبورد.',
+            ], 403);
+        }
+
         $user->password = Hash::make('123456');
 
         $user->save();

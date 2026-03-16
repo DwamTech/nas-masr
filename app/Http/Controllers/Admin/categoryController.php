@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Make;
 use App\Services\OptionRankService;
+use App\Support\DashboardFilterListsCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -160,6 +161,11 @@ class categoryController extends Controller
             // Keep automotive make/model ranks synchronized across related categories.
             if ($this->shouldSyncAutomotiveRanks($resolvedFieldName)) {
                 $this->syncAutomotiveRanks($slug, $resolvedFieldName, $validated['ranks'], $service);
+            }
+
+            DashboardFilterListsCache::flushFieldCategory($slug);
+            if ($this->shouldSyncAutomotiveRanks($resolvedFieldName)) {
+                DashboardFilterListsCache::flushAutomotive();
             }
 
             return response()->json([

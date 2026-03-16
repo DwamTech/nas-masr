@@ -13,6 +13,7 @@ use App\Models\Governorate;
 use App\Models\Make;
 use App\Support\Section;
 use App\Support\OptionsHelper;
+use App\Support\DashboardFilterListsCache;
 use Illuminate\Http\Request;
 use App\Models\CategoryMainSection;
 use App\Models\CategorySubSection;
@@ -287,6 +288,8 @@ class CategoryFieldsController extends Controller
 
         $field = CategoryField::create($data);
 
+        DashboardFilterListsCache::flushFieldCategory((string) $data['category_slug']);
+
         return response()->json([
             'message' => 'تم إنشاء الحقل بنجاح',
             'data' => $field,
@@ -331,6 +334,8 @@ class CategoryFieldsController extends Controller
 
         $field->update($data);
 
+        DashboardFilterListsCache::flushFieldCategory((string) $field->category_slug);
+
         return response()->json([
             'message' => 'تم تحديث الحقل بنجاح',
             'data' => $field->fresh(),
@@ -341,6 +346,8 @@ class CategoryFieldsController extends Controller
     public function destroy(CategoryField $categoryField)
     {
         $categoryField->update(['is_active' => false]);
+
+        DashboardFilterListsCache::flushFieldCategory((string) $categoryField->category_slug);
 
         return response()->json([
             'message' => 'تم إلغاء تفعيل الحقل',

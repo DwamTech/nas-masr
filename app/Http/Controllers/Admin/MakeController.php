@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Support\DashboardFilterListsCache;
 
 
 class MakeController extends Controller
@@ -179,6 +180,8 @@ class MakeController extends Controller
 
         $make->load('models');
 
+        DashboardFilterListsCache::flushAutomotive();
+
         return response()->json($make, $isNew ? 201 : 200);
     }
 
@@ -192,6 +195,13 @@ class MakeController extends Controller
             $make->update(['name' => $data['name']]);
         }
 
+        DashboardFilterListsCache::flushAutomotive();
+
+        return response()->json($make->load('models'));
+    }
+
+    public function show(Make $make)
+    {
         return response()->json($make->load('models'));
     }
 
@@ -214,6 +224,8 @@ class MakeController extends Controller
         $make->models()->delete();
 
         $make->delete();
+
+        DashboardFilterListsCache::flushAutomotive();
 
         return response()->json("Deleted successfully", 204);
     }
@@ -384,6 +396,8 @@ class MakeController extends Controller
             ]);
         }
 
+        DashboardFilterListsCache::flushAutomotive();
+
         // ✅ Response بالشكل اللي تحبيه
         return response()->json([
             'make_id' => $make->id,
@@ -399,6 +413,7 @@ class MakeController extends Controller
         ]);
 
         $model->update($data);
+        DashboardFilterListsCache::flushAutomotive();
         return response()->json($model);
     }
 
@@ -413,6 +428,8 @@ class MakeController extends Controller
         }
 
         $model->delete();
+
+        DashboardFilterListsCache::flushAutomotive();
 
         return response()->json("Deleted successfully", 204);
     }

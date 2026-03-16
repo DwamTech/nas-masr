@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Models\Listing;
 use App\Models\UserConversation;
+use Illuminate\Support\Facades\Storage;
 
 
 class User extends Authenticatable
@@ -39,6 +40,8 @@ class User extends Authenticatable
         'otp',
         'otp_verified_at',
         'role',
+        'allowed_dashboard_pages',
+        'profile_image',
         'is_representative',
         'fcm_token',
     ];
@@ -67,6 +70,7 @@ class User extends Authenticatable
             'otp_verified' => 'boolean',
             'receive_external_notif' => 'boolean',
             'is_representative' => 'boolean',
+            'allowed_dashboard_pages' => 'array',
         ];
     }
 
@@ -143,6 +147,87 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is an employee with dashboard access.
+     */
+    public function isEmployee(): bool
+    {
+        return $this->role === 'employee';
+    }
+
+    /**
+     * Dashboard staff roles that should only be managed by admins.
+     *
+     * @return array<int, string>
+     */
+    public static function privilegedDashboardRoles(): array
+    {
+        return ['admin', 'reviewer', 'employee'];
+    }
+
+    /**
+     * Check if the user belongs to a privileged dashboard role.
+     */
+    public function isPrivilegedDashboardRole(): bool
+    {
+        return in_array((string) $this->role, self::privilegedDashboardRoles(), true);
+    }
+
+    /**
+     * Check if the user may access dashboard routes.
+     */
+    public function canAccessDashboard(): bool
+    {
+        return $this->isAdmin() || $this->isEmployee();
+    }
+
+    /**
+     * Returns normalized dashboard page keys for the user.
+     *
+     * @return array<int, string>
+     */
+    public function dashboardPageKeys(): array
+    {
+        $raw = $this->allowed_dashboard_pages;
+
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($value) => is_string($value) ? trim($value) : null,
+            $raw
+        ))));
+    }
+
+    /**
+     * Check if the user has access to a dashboard page key.
+     */
+    public function hasDashboardPage(string $pageKey): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return in_array($pageKey, $this->dashboardPageKeys(), true);
+    }
+
+    /**
+     * Full URL for profile image if available.
+     */
+    public function getProfileImageUrlAttribute(): ?string
+    {
+        if (!$this->profile_image) {
+            return null;
+        }
+
+        if (str_starts_with($this->profile_image, 'http://') || str_starts_with($this->profile_image, 'https://')) {
+            return $this->profile_image;
+        }
+
+        return Storage::disk('public')->url($this->profile_image);
+    }
+
+    /**
      * Check if user is a representative (delegate).
      */
     public function isRepresentative(): bool
@@ -158,4 +243,3 @@ class User extends Authenticatable
         return $this->role === 'advertiser';
     }
 }
-

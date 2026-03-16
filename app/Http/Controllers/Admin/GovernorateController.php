@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Governorate;
 use App\Models\City;
 use Illuminate\Http\Request;
+use App\Support\DashboardFilterListsCache;
 
 class GovernorateController extends Controller
 {
@@ -34,6 +35,8 @@ class GovernorateController extends Controller
             'governorate_id' => $gov->id,
         ]);
 
+        DashboardFilterListsCache::flushGovernorates();
+
         return response()->json($gov->load('cities'), 201);
     }
     public function storCities(Request $request, Governorate $governorate)
@@ -46,6 +49,8 @@ class GovernorateController extends Controller
             'name' => $data['name'],
             'governorate_id' => $governorate->id,
         ]);
+
+        DashboardFilterListsCache::flushGovernorates();
 
         return response()->json($city, 201);
     }
@@ -60,7 +65,16 @@ class GovernorateController extends Controller
             $governorate->update(['name' => $data['name']]);
         }
 
+        DashboardFilterListsCache::flushGovernorates();
+
         return response()->json($governorate->load('cities'));
+    }
+
+    public function showGov(Governorate $governorate)
+    {
+        return response()->json(
+            $governorate->load(['cities' => fn ($query) => $query->orderBy('sort_order')->orderBy('name')])
+        );
     }
 
     public function destroyGov(Governorate $governorate)
@@ -75,6 +89,8 @@ class GovernorateController extends Controller
         }
 
         $governorate->delete();
+
+        DashboardFilterListsCache::flushGovernorates();
 
         return response()->json([
             'success' => true,
@@ -116,6 +132,7 @@ class GovernorateController extends Controller
         ]);
 
         $city->update($data);
+        DashboardFilterListsCache::flushGovernorates();
         return response()->json($city);
     }
 
@@ -132,6 +149,7 @@ class GovernorateController extends Controller
         }
 
         $city->delete();
+        DashboardFilterListsCache::flushGovernorates();
 
         return response()->json([
             'success' => true,
@@ -152,6 +170,8 @@ class GovernorateController extends Controller
             Governorate::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
         }
 
+        DashboardFilterListsCache::flushGovernorates();
+
         return response()->json(['message' => 'تم تحديث ترتيب المحافظات بنجاح']);
     }
 
@@ -167,6 +187,8 @@ class GovernorateController extends Controller
         foreach ($data['ranks'] as $item) {
             City::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
         }
+
+        DashboardFilterListsCache::flushGovernorates();
 
         return response()->json(['message' => 'تم تحديث ترتيب المدن بنجاح']);
     }
@@ -207,4 +229,3 @@ class GovernorateController extends Controller
         ]);
     }
 }
-
