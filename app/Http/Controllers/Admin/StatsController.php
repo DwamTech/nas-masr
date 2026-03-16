@@ -212,8 +212,11 @@ class StatsController extends Controller
         $role = $request->query('role'); // admin, user, reviewer, advertiser
         $status = $request->query('status'); // active, blocked
         $q = trim((string) $request->query('q', ''));
+        $viewer = $request->user();
+        $viewerIsAdmin = $viewer && $viewer->isAdmin();
 
         $users = User::query()
+            ->when(!$viewerIsAdmin, fn ($qr) => $qr->whereNotIn('role', User::privilegedDashboardRoles()))
             ->when($role, fn($qr) => $qr->where('role', $role))
             ->when($status, fn($qr) => $qr->where('status', $status))
             ->when($q !== '', function ($qr) use ($q) {
@@ -224,6 +227,8 @@ class StatsController extends Controller
                 });
             })
             ->withCount('listings')
+            ->withSum('listings as whatsapp_clicks', 'whatsapp_clicks')
+            ->withSum('listings as call_clicks', 'call_clicks')
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
@@ -231,6 +236,7 @@ class StatsController extends Controller
             return [
                 'id' => $u->id,
                 'name' => $u->name,
+                'email' => $u->email,
                 'phone' => $u->phone,
                 'address' => $u->address,
                 'user_code' => (string) $u->id,  // Always use ID as user_code
@@ -238,8 +244,12 @@ class StatsController extends Controller
                 'status' => $u->status ?? 'active',
                 'registered_at' => optional($u->created_at)->toDateString(),
                 'listings_count' => $u->listings_count ?? 0,
+                'whatsapp_clicks' => (int) ($u->whatsapp_clicks ?? 0),
+                'call_clicks' => (int) ($u->call_clicks ?? 0),
                 'role' => $u->role ?? 'user',
                 'phone_verified' => (bool) $u->otp_verified,
+                'allowed_dashboard_pages' => $u->dashboardPageKeys(),
+                'profile_image_url' => $u->profile_image_url,
             ];
         })->values();
 
@@ -324,6 +334,8 @@ class StatsController extends Controller
                 'plan_type' => $l->plan_type,
                 'price' => (float) ($l->price ?? 0),
                 'views' => (int) ($l->views ?? 0),
+                'whatsapp_clicks' => (int) ($l->whatsapp_clicks ?? 0),
+                'call_clicks' => (int) ($l->call_clicks ?? 0),
                 'advertiser_id' => (int) $l->user_id,
                 'advertiser_phone' => $l->relationLoaded('user') && $l->user ? $l->user->phone : null,
             ];

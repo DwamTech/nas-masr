@@ -50,6 +50,8 @@ class BannerController extends Controller
         'missing',
         'home_ads',
         'home',
+        'payment_single_ad_methods',
+        'payment_packages_subscribe',
         'unified' // fallback
     ];
 
@@ -82,7 +84,7 @@ class BannerController extends Controller
     {
         $request->validate([
             'slug' => 'required|string|in:' . implode(',', $this->allowedSlugs),
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:4096'
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:40096'
         ]);
 
         $slug = $request->input('slug');
@@ -113,7 +115,7 @@ class BannerController extends Controller
         }
 
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:4096'
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:40096'
         ]);
 
         $file = $request->file('image');
@@ -140,7 +142,7 @@ class BannerController extends Controller
                 File::delete($oldPath);
             }
         }
-        
+
         // Also clean folder just in case (as per previous logic)
         // But be careful if multiple records point to same folder (unlikely here)
         $files = File::files($directory);
@@ -151,7 +153,7 @@ class BannerController extends Controller
         // Save new file
         $filename = Str::random(40) . '.' . $file->getClientOriginalExtension();
         $file->move($directory, $filename);
-        
+
         $relativePath = "storage/uploads/banner/{$slug}/{$filename}";
 
         // Update or Create DB record

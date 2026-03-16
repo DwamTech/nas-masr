@@ -9,6 +9,7 @@ use App\Models\CategorySubSection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Listing;
+use App\Support\DashboardFilterListsCache;
 use Illuminate\Validation\Rule;
 
 
@@ -145,6 +146,8 @@ class CategorySectionsController extends Controller
             $q->where('is_active', true)->orderBy('sort_order');
         }]);
 
+        DashboardFilterListsCache::flushSections($categorySlug, (int) $main->id);
+
         return response()->json($main, $isNew ? 201 : 200);
     }
 
@@ -181,6 +184,11 @@ class CategorySectionsController extends Controller
             ]);
         }
 
+        $categorySlug = (string) Category::where('id', $mainSection->category_id)->value('slug');
+        if ($categorySlug !== '') {
+            DashboardFilterListsCache::flushSections($categorySlug, (int) $mainSection->id);
+        }
+
         return response()->json([
             'main_section_id' => $mainSection->id,
             'sub_sections'    => $created,
@@ -209,6 +217,11 @@ class CategorySectionsController extends Controller
 
         $mainSection->update($data);
 
+        $categorySlug = (string) Category::where('id', $mainSection->category_id)->value('slug');
+        if ($categorySlug !== '') {
+            DashboardFilterListsCache::flushSections($categorySlug, (int) $mainSection->id);
+        }
+
         return response()->json(
             $mainSection->load('subSections')
         );
@@ -231,6 +244,11 @@ class CategorySectionsController extends Controller
 
         $mainSection->subSections()->delete();
         $mainSection->delete();
+
+        $categorySlug = (string) Category::where('id', $mainSection->category_id)->value('slug');
+        if ($categorySlug !== '') {
+            DashboardFilterListsCache::flushSections($categorySlug, (int) $mainSection->id);
+        }
 
         return response()->json("Deleted successfully", 204);
     }
@@ -260,6 +278,11 @@ class CategorySectionsController extends Controller
 
         $subSection->update($data);
 
+        $categorySlug = (string) Category::where('id', $subSection->category_id)->value('slug');
+        if ($categorySlug !== '') {
+            DashboardFilterListsCache::flushSections($categorySlug, (int) $subSection->main_section_id);
+        }
+
         return response()->json($subSection);
     }
 
@@ -276,6 +299,66 @@ class CategorySectionsController extends Controller
 
         $subSection->delete();
 
+        $categorySlug = (string) Category::where('id', $subSection->category_id)->value('slug');
+        if ($categorySlug !== '') {
+            DashboardFilterListsCache::flushSections($categorySlug, (int) $subSection->main_section_id);
+        }
+
         return response()->json("Deleted successfully", 204);
+    }
+
+    // POST /api/admin/category-sections/main/ranks
+    public function updateMainRanks(Request $request)
+    {
+        $data = $request->validate([
+            'ranks' => 'required|array',
+            'ranks.*.id' => 'required|integer|exists:category_main_sections,id',
+            'ranks.*.rank' => 'required|integer|min:0',
+        ]);
+
+        foreach ($data['ranks'] as $item) {
+            CategoryMainSection::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
+        }
+
+        $categoryIds = array_values(array_unique(array_map(
+            fn (array $item) => (int) CategoryMainSection::where('id', $item['id'])->value('category_id'),
+            $data['ranks']
+        )));
+
+        foreach ($categoryIds as $categoryId) {
+            $categorySlug = (string) Category::where('id', $categoryId)->value('slug');
+            if ($categorySlug !== '') {
+                DashboardFilterListsCache::flushSections($categorySlug);
+            }
+        }
+
+        return response()->json(['message' => 'Ranks updated successfully']);
+    }
+
+    // POST /api/admin/category-sections/sub/ranks
+    public function updateSubRanks(Request $request)
+    {
+        $data = $request->validate([
+            'ranks' => 'required|array',
+            'ranks.*.id' => 'required|integer|exists:category_sub_section,id',
+            'ranks.*.rank' => 'required|integer|min:0',
+        ]);
+
+        foreach ($data['ranks'] as $item) {
+            CategorySubSection::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
+        }
+
+        $subSections = CategorySubSection::query()
+            ->whereIn('id', array_map(fn (array $item) => (int) $item['id'], $data['ranks']))
+            ->get(['id', 'category_id', 'main_section_id']);
+
+        foreach ($subSections as $subSection) {
+            $categorySlug = (string) Category::where('id', $subSection->category_id)->value('slug');
+            if ($categorySlug !== '') {
+                DashboardFilterListsCache::flushSections($categorySlug, (int) $subSection->main_section_id);
+            }
+        }
+
+        return response()->json(['message' => 'Ranks updated successfully']);
     }
 }

@@ -3,25 +3,115 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Models\CategoryFieldOptionRank;
 use App\Models\Listing;
 use App\Models\Make;
 use App\Models\CarModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Support\DashboardFilterListsCache;
 
 
 class MakeController extends Controller
 {
+    /**
+     * Request-level cache for ranks map.
+     *
+     * @var array<string, array<string, int>>
+     */
+    private array $fieldRankMapCache = [];
+
     public function index()
     {
-        $items = Make::with('models')->orderBy('name')->get();
-        $items->push((object)[
+        $categoryId = Category::where('slug', 'cars')->value('id');
+        $items = Make::with('models')->get();
+        
+        // معالجة الماركات والموديلات (الترتيب سيتم في الفرونت إند)
+        $makesArray = [];
+        foreach ($items as $make) {
+            $modelNames = $make->models->pluck('name')->toArray();
+
+            if ($categoryId) {
+                $modelNames = $this->sortOptionsByRankWithFallbackFields(
+                    (int) $categoryId,
+                    [
+                        "model_make_id_{$make->id}",
+                        'model_' . $this->normalizeRankToken((string) $make->name),
+                        "model_{$make->name}",
+                        "Model_{$make->name}",
+                        "model::{$make->name}",
+                        'model',
+                        'Model',
+                    ],
+                    $modelNames
+                );
+            }
+
+            $modelNames = \App\Support\OptionsHelper::processOptions($modelNames, false, false);
+            $modelsByName = $make->models->keyBy('name');
+            
+            $makesArray[] = [
+                'id' => $make->id,
+                'name' => $make->name,
+                'models' => collect($modelNames)->values()->map(function($modelName, $idx) use ($make, $modelsByName) {
+                    $model = $modelsByName->get($modelName);
+                    return (object)[
+                        'id' => $model?->id,
+                        'name' => $modelName,
+                        'make_id' => $make->id,
+                        'rank' => $idx + 1,
+                    ];
+                })->all()
+            ];
+        }
+
+        if ($categoryId) {
+            $nameOrder = $this->sortOptionsByRankWithFallbackFields(
+                (int) $categoryId,
+                ['brand', 'Brand'],
+                array_values(array_map(fn ($row) => (string) $row['name'], $makesArray))
+            );
+
+            $byName = [];
+            foreach ($makesArray as $row) {
+                $byName[(string) $row['name']] = $row;
+            }
+
+            $sortedMakesArray = [];
+            foreach ($nameOrder as $name) {
+                if (isset($byName[$name])) {
+                    $sortedMakesArray[] = $byName[$name];
+                    unset($byName[$name]);
+                }
+            }
+            foreach ($byName as $row) {
+                $sortedMakesArray[] = $row;
+            }
+
+            $makesArray = $sortedMakesArray;
+        }
+
+        $makesArray = collect($makesArray)->values()->map(function ($row, $idx) {
+            $row['rank'] = $idx + 1;
+            return $row;
+        })->all();
+        
+        // إضافة "غير ذلك" في الآخر
+        $makesArray[] = [
             'id' => null,
             'name' => 'غير ذلك',
             'models' => []
-        ]);
-        return response()->json($items);
+        ];
+        
+        // تحويل إلى objects
+        $result = collect($makesArray)->map(function($item) {
+            return (object)$item;
+        });
+        
+        return response()->json($result);
     }
 
     public function addMake(Request $request)
@@ -90,6 +180,8 @@ class MakeController extends Controller
 
         $make->load('models');
 
+        DashboardFilterListsCache::flushAutomotive();
+
         return response()->json($make, $isNew ? 201 : 200);
     }
 
@@ -103,6 +195,13 @@ class MakeController extends Controller
             $make->update(['name' => $data['name']]);
         }
 
+        DashboardFilterListsCache::flushAutomotive();
+
+        return response()->json($make->load('models'));
+    }
+
+    public function show(Make $make)
+    {
         return response()->json($make->load('models'));
     }
 
@@ -126,18 +225,149 @@ class MakeController extends Controller
 
         $make->delete();
 
+        DashboardFilterListsCache::flushAutomotive();
+
         return response()->json("Deleted successfully", 204);
     }
 
     public function models(Make $make)
     {
-        $models = $make->models()->orderBy('name')->get();
-        $models->push((object)[
-            'id' => null,
-            'name' => 'غير ذلك',
-            'make_id' => $make->id
-        ]);
-        return response()->json($models);
+        $models = $make->models()->get();
+        
+        // معالجة الموديلات (الترتيب سيتم في الفرونت إند)
+        $modelNames = $models->pluck('name')->toArray();
+
+        $categoryId = Category::where('slug', 'cars')->value('id');
+        if ($categoryId) {
+            $modelNames = $this->sortOptionsByRankWithFallbackFields(
+                (int) $categoryId,
+                [
+                    "model_make_id_{$make->id}",
+                    'model_' . $this->normalizeRankToken((string) $make->name),
+                    "model_{$make->name}",
+                    "Model_{$make->name}",
+                    "model::{$make->name}",
+                    'model',
+                    'Model',
+                ],
+                $modelNames
+            );
+        }
+
+        $modelNames = \App\Support\OptionsHelper::processOptions($modelNames, false, false);
+        
+        // تحويل إلى objects مع الحفاظ على الترتيب
+        $sortedModels = collect($modelNames)->map(function($name) use ($models, $make) {
+            $model = $models->firstWhere('name', $name);
+            return (object)[
+                'id' => $model ? $model->id : null,
+                'name' => $name,
+                'make_id' => $make->id
+            ];
+        });
+        
+        return response()->json($sortedModels);
+    }
+
+    /**
+     * Try multiple rank field names and use the first one that has data.
+     *
+     * @param int $categoryId
+     * @param array<int, string> $fieldNames
+     * @param array $options
+     * @return array
+     */
+    private function sortOptionsByRankWithFallbackFields(int $categoryId, array $fieldNames, array $options): array
+    {
+        foreach ($fieldNames as $fieldName) {
+            $key = trim((string) $fieldName);
+            if ($key === '') {
+                continue;
+            }
+            $rankMap = $this->getRankMap($categoryId, $key);
+            if (!empty($rankMap)) {
+                return $this->sortOptionsByExplicitRankMap($options, $rankMap);
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Resolve rank map with per-request caching.
+     *
+     * @param int $categoryId
+     * @param string $fieldName
+     * @return array<string, int>
+     */
+    private function getRankMap(int $categoryId, string $fieldName): array
+    {
+        $cacheKey = $categoryId . '|' . $fieldName;
+        if (array_key_exists($cacheKey, $this->fieldRankMapCache)) {
+            return $this->fieldRankMapCache[$cacheKey];
+        }
+
+        $rankMap = CategoryFieldOptionRank::where('category_id', $categoryId)
+            ->where('field_name', $fieldName)
+            ->pluck('rank', 'option_value')
+            ->toArray();
+
+        $this->fieldRankMapCache[$cacheKey] = $rankMap;
+        return $rankMap;
+    }
+
+    /**
+     * Sort options with a preloaded rank map.
+     *
+     * @param array $options
+     * @param array<string, int> $rankMap
+     * @return array
+     */
+    private function sortOptionsByExplicitRankMap(array $options, array $rankMap): array
+    {
+        $otherOption = null;
+        $withRanks = [];
+        $withoutRanks = [];
+
+        foreach ($options as $option) {
+            if ($option === 'غير ذلك') {
+                $otherOption = $option;
+            } elseif (isset($rankMap[$option])) {
+                $withRanks[] = ['option' => $option, 'rank' => $rankMap[$option]];
+            } else {
+                $withoutRanks[] = $option;
+            }
+        }
+
+        usort($withRanks, function ($a, $b) {
+            return $a['rank'] <=> $b['rank'];
+        });
+
+        $sortedWithRanks = array_map(function ($item) {
+            return $item['option'];
+        }, $withRanks);
+
+        $result = array_merge($sortedWithRanks, $withoutRanks);
+        if ($otherOption !== null) {
+            $result[] = $otherOption;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Normalize text token for rank key matching.
+     *
+     * @param string $value
+     * @return string
+     */
+    private function normalizeRankToken(string $value): string
+    {
+        $v = preg_replace('/\s+/u', ' ', trim($value));
+        if (!is_string($v)) {
+            return '';
+        }
+        return strtolower($v);
     }
 
     public function addModel(Request $request, Make $make)
@@ -166,6 +396,8 @@ class MakeController extends Controller
             ]);
         }
 
+        DashboardFilterListsCache::flushAutomotive();
+
         // ✅ Response بالشكل اللي تحبيه
         return response()->json([
             'make_id' => $make->id,
@@ -181,6 +413,7 @@ class MakeController extends Controller
         ]);
 
         $model->update($data);
+        DashboardFilterListsCache::flushAutomotive();
         return response()->json($model);
     }
 
@@ -195,6 +428,8 @@ class MakeController extends Controller
         }
 
         $model->delete();
+
+        DashboardFilterListsCache::flushAutomotive();
 
         return response()->json("Deleted successfully", 204);
     }

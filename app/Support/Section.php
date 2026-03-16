@@ -25,18 +25,10 @@ final class Section
             ->where('category_slug', $slug)
             ->where('is_active', true)
             ->orderBy('sort_order')
-            ->get()
-            ->transform(function ($field) {
-                if (!empty($field->options) && is_array($field->options)) {
-                    if (!in_array('غير ذلك', $field->options)) {
-                        $options = $field->options;
-                        $options[] = 'غير ذلك';
-                        $field->options = $options;
-                    }
-                }
-                return $field;
-            })
-            ->toArray();
+            ->get();
+
+        // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
+        $fields = OptionsHelper::processFieldsCollection($fields)->toArray();
 
         return new self(
             slug: $slug,
@@ -60,18 +52,10 @@ final class Section
             ->where('category_slug', $cat->slug)
             ->where('is_active', true)
             ->orderBy('sort_order')
-            ->get()
-            ->transform(function ($field) {
-                if (!empty($field->options) && is_array($field->options)) {
-                    if (!in_array('غير ذلك', $field->options)) {
-                        $options = $field->options;
-                        $options[] = 'غير ذلك';
-                        $field->options = $options;
-                    }
-                }
-                return $field;
-            })
-            ->toArray();
+            ->get();
+
+        // استخدام OptionsHelper لضمان "غير ذلك" في الآخر
+        $fields = OptionsHelper::processFieldsCollection($fields)->toArray();
 
         return new self(
             slug: $cat->slug,
@@ -149,6 +133,8 @@ final class Section
     }
     public function rules(): array
     {
+        $requiresTitle = $this->slug === 'spare-parts' || $this->supportsSections();
+
         $priceRules = ($this->slug === 'missing' || $this->slug === 'jobs')
             ? ['nullable', 'numeric', 'min:0']
             : ['required', 'numeric', 'min:0'];
@@ -158,7 +144,9 @@ final class Section
             : ['required', 'string', 'in:standard,premium,featured,free'];
 
         $base = [
-            'title' => ['nullable', 'string', 'max:180'],
+            'title' => $requiresTitle
+                ? ['required', 'string', 'max:180']
+                : ['nullable', 'string', 'max:180'],
             'price' => $priceRules,
             'description' => ['required', 'string'],
 
@@ -192,6 +180,11 @@ final class Section
 
         $attrs = [];
         foreach ($this->fields as $f) {
+            // العنوان يدار من الحقل الرئيسي `title` فقط، وليس attributes.title
+            if (($f['field_name'] ?? null) === 'title') {
+                continue;
+            }
+
             $key = 'attributes.' . $f['field_name'];
             $rules = [(!empty($f['required']) ? 'required' : 'nullable')];
 

@@ -36,6 +36,14 @@ class ListingController extends Controller
 
     public function index(string $section, Request $request)
     {
+        \Log::info('=== LISTING INDEX START ===');
+        \Log::info('Section: ' . $section);
+        \Log::info('Query Params: ' . json_encode($request->query()));
+        \Log::info('All Input: ' . json_encode($request->all()));
+        \Log::info('Headers: ' . json_encode($request->headers->all()));
+        \Log::info('Method: ' . $request->method());
+        \Log::info('URL: ' . $request->fullUrl());
+        
         Listing::autoExpire();
         $sec = Section::fromSlug($section);
         $typesByKey = Listing::typesByKeyForSection($sec);
@@ -134,8 +142,20 @@ class ListingController extends Controller
         $attrLike = array_intersect_key($attrLike, array_flip($filterableKeys));
         $q->attrLike($attrLike);
 
+        \Log::info('=== QUERY DETAILS ===');
+        \Log::info('Keyword: ' . $request->query('q'));
+        \Log::info('SQL: ' . $q->toSql());
+        \Log::info('Bindings: ' . json_encode($q->getBindings()));
 
         $rows = $q->get();
+        
+        \Log::info('=== RESULTS ===');
+        \Log::info('Count: ' . $rows->count());
+        if ($rows->count() > 0) {
+            \Log::info('First Result ID: ' . $rows->first()->id);
+            \Log::info('First Result Title: ' . $rows->first()->title);
+        }
+        \Log::info('=== LISTING INDEX END ===');
 
         // زيّدي views لكل النتائج (بالشُحنات)
         // if ($rows->isNotEmpty()) {
@@ -152,9 +172,12 @@ class ListingController extends Controller
 
         $categorySlug = $sec->slug;
         $categoryName = $sec->name;
+        
+        // Get category model for unified image fields
+        $category = \App\Models\Category::where('slug', $categorySlug)->first();
 
 
-        $items = $rows->map(function ($item) use ($supportsMakeModel, $supportsSections, $categorySlug, $categoryName) {
+        $items = $rows->map(function ($item) use ($supportsMakeModel, $supportsSections, $categorySlug, $categoryName, $category) {
             $attrs = [];
             if ($item->relationLoaded('attributes')) {
                 foreach ($item->attributes as $row) {
@@ -166,6 +189,7 @@ class ListingController extends Controller
                 'attributes' => $attrs,
                 'governorate' => ($item->relationLoaded('governorate') && $item->governorate) ? $item->governorate->name : null,
                 'city' => ($item->relationLoaded('city') && $item->city) ? $item->city->name : null,
+                'title' => $item->title,
                 'price' => $item->price,
                 'contact_phone' => $item->contact_phone,
                 'whatsapp_phone' => $item->whatsapp_phone,
@@ -183,6 +207,11 @@ class ListingController extends Controller
                 // الكاتيجري
                 'category' => $categorySlug,   // slug
                 'category_name' => $categoryName,   // الاسم
+                
+                // Unified category image fields
+                'is_global_image_active' => $category ? ($category->is_global_image_active ?? false) : false,
+                'global_image_url' => $category ? $category->global_image_url : null,
+                'global_image_full_url' => $category ? $category->global_image_full_url : null,
             ];
 
             if ($supportsMakeModel) {
@@ -270,51 +299,65 @@ class ListingController extends Controller
         if (!empty($data['plan_type']) && $data['plan_type'] !== 'free') {
             $planNorm = $this->normalizePlan($data['plan_type']);
 
-            // 1. Try to consume from Package (UserPackages) first - This is what Admin creates
-            $packageResult = $this->consumeForPlan($user->id, $planNorm, $sec->id());
-            $packageData   = $packageResult->getData(true);
+            // Check if plan price is 0 (free plan in this category)
+            $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
+            $planPrice = $planNorm === 'featured'
+                ? (float) ($prices?->featured_ad_price ?? 0)
+                : (float) ($prices?->standard_ad_price ?? 0);
 
-            if (!empty($packageData['success']) && $packageData['success'] === true) {
-                // Success! Package consumed
-                $data['expire_at'] = Carbon::parse($packageData['expire_date']);
-                $paymentType = 'package';
-                $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
-                $priceOut = $planNorm === 'featured'
-                    ? (float) ($prices?->featured_ad_price ?? 0)
-                    : (float) ($prices?->standard_ad_price ?? 0);
-                $data['publish_via'] = env('LISTING_PUBLISH_VIA_PACKAGE', 'package');
+            // 0. If plan price is 0, accept ad without any checks
+            if ($planPrice == 0) {
+                $days = $planNorm === 'featured'
+                    ? ((int)($prices?->featured_days ?? 30))
+                    : ((int)($prices?->standard_days ?? 30));
+
+                $data['expire_at'] = now()->addDays($days > 0 ? $days : 30);
+                $paymentType = 'free_plan';
+                $priceOut = 0.0;
+                $data['publish_via'] = 'free_plan';
             } else {
-                // 2. If no Package, check for legacy Subscription (UserPlanSubscription)
-                $activeSub = UserPlanSubscription::query()
-                    ->where('user_id', $user->id)
-                    ->where('plan_type', $planNorm)
-                    ->where('payment_status', 'paid')
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
-                    })
-                    ->first();
+                // 1. Try to consume from Package (UserPackages) first - This is what Admin creates
+                $packageResult = $this->consumeForPlan($user->id, $planNorm, $sec->id());
+                $packageData   = $packageResult->getData(true);
 
-                if ($activeSub) {
-                    $data['expire_at'] = $activeSub->expires_at;
-                    $paymentType = 'subscription';
-                    $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
-                    // Note: Consumption logic for subscription can be added here if needed
-                } elseif ($isAdmin) {
-                    // 3. Admin Bypass
-                    $paymentRequired = false;
-                    $prices = CategoryPlanPrice::where('category_id', $sec->id())->first();
-                    $days = $planNorm === 'featured'
-                        ? ((int)($prices?->featured_days ?? 30))
-                        : ((int)($prices?->standard_days ?? 30));
-
-                    $data['expire_at'] = now()->addDays($days > 0 ? $days : 30);
-                    $paymentType = 'admin_bypass';
-                    $priceOut = 0.0;
-                    $data['publish_via'] = 'admin';
+                if (!empty($packageData['success']) && $packageData['success'] === true) {
+                    // Success! Package consumed
+                    $data['expire_at'] = Carbon::parse($packageData['expire_date']);
+                    $paymentType = 'package';
+                    $priceOut = $planPrice;
+                    $data['publish_via'] = env('LISTING_PUBLISH_VIA_PACKAGE', 'package');
                 } else {
-                    // 4. No Package, No Sub -> Payment Required
-                    $paymentRequired = true;
-                    $message = $packageData['message'] ?? "لا تملك باقة فعّالة أو رصيد كافٍ، يجب عليك الدفع لنشر هذا الإعلان.";
+                    // 2. If no Package, check for legacy Subscription (UserPlanSubscription)
+                    $activeSub = UserPlanSubscription::query()
+                        ->where('user_id', $user->id)
+                        ->where('plan_type', $planNorm)
+                        ->where('payment_status', 'paid')
+                        ->where(function ($q) {
+                            $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
+                        })
+                        ->first();
+
+                    if ($activeSub) {
+                        $data['expire_at'] = $activeSub->expires_at;
+                        $paymentType = 'subscription';
+                        $data['publish_via'] = env('LISTING_PUBLISH_VIA_SUBSCRIPTION', 'subscription');
+                        // Note: Consumption logic for subscription can be added here if needed
+                    } elseif ($isAdmin) {
+                        // 3. Admin Bypass
+                        $paymentRequired = false;
+                        $days = $planNorm === 'featured'
+                            ? ((int)($prices?->featured_days ?? 30))
+                            : ((int)($prices?->standard_days ?? 30));
+
+                        $data['expire_at'] = now()->addDays($days > 0 ? $days : 30);
+                        $paymentType = 'admin_bypass';
+                        $priceOut = 0.0;
+                        $data['publish_via'] = 'admin';
+                    } else {
+                        // 4. No Package, No Sub -> Payment Required
+                        $paymentRequired = true;
+                        $message = $packageData['message'] ?? "لا تملك باقة فعّالة أو رصيد كافٍ، يجب عليك الدفع لنشر هذا الإعلان.";
+                    }
                 }
             }
         } else {
@@ -584,78 +627,146 @@ class ListingController extends Controller
         }
     }
 
-    public function show(string $section, Listing $listing, NotificationService $notifications)
+    public function show(string $section, Listing $listing, NotificationService $notifications, Request $request)
     {
         $sec = Section::fromSlug($section);
         abort_if($listing->category_id !== $sec->id(), 404);
 
         $listing->increment('views');
-        $viewer = request()->user();
-        if ($viewer->role != 'admin') {
-            if ($viewer && $viewer->id !== $listing->user_id) {
-                $notifications->dispatch(
-                    (int) $listing->user_id,
-                    ' تمت مشاهدة إعلانك',
-                    'قام المستخدم #' . $viewer->id . ' بمشاهدة إعلانك #' . $listing->id . ' في قسم ' . $sec->name,
-                    'view',
-                    ['viewer_id' => (int) $viewer->id, 'listing_id' => (int) $listing->id, 'category_slug' => $sec->slug]
-                );
-            }
+        // This route is public; resolve token-authenticated user explicitly.
+        $viewer = $request->user('api') ?? $request->user();
+
+        // Send notification after the HTTP response to avoid delaying ad details load.
+        if ($viewer && $viewer->role != 'admin' && $viewer->id !== $listing->user_id) {
+            $this->dispatchViewNotificationAfterResponse(
+                $notifications,
+                (int) $listing->user_id,
+                (int) $viewer->id,
+                (int) $listing->id,
+                (string) $sec->name,
+                (string) $sec->slug
+            );
         }
 
-        $banner = null;
         $slug = $sec->slug;
+        $banner = $this->resolveCategoryBannerPath($slug);
 
-        // 1. Try to find banner from DB for this category
-        $catBanner = CategoryBanner::where('slug', $slug)->where('is_active', true)->first();
-        if ($catBanner) {
-            $banner = $catBanner->banner_path;
-        }
-
-        // 2. Fallback to unified if not found
-        if (!$banner) {
-            $unifiedBanner = CategoryBanner::where('slug', 'unified')->where('is_active', true)->first();
-            if ($unifiedBanner) {
-                $banner = $unifiedBanner->banner_path;
-            }
-        }
-
-        // 3. Last resort fallback (FileSystem check for legacy support or if DB is empty)
-        if (!$banner) {
-            $unifiedPath = public_path("storage/uploads/banner/unified");
-            if (File::isDirectory($unifiedPath)) {
-                $files = File::files($unifiedPath);
-                if (count($files) > 0) {
-                    $banner = "storage/uploads/banner/unified/" . $files[0]->getFilename();
-                }
-            }
-        }
-
-        $owner = User::select('id', 'name', 'created_at')->find($listing->user_id);
-        $adsCount = Listing::where('user_id', $listing->user_id)->count();
+        $owner = User::query()
+            ->select('id', 'name', 'created_at')
+            ->withCount('listings')
+            ->find($listing->user_id);
 
         $userPayload = [
             'id' => $owner?->id,
             'name' => $owner?->name ?? "advertiser",
             'joined_at' => $owner?->created_at?->toIso8601String(),
             'joined_at_human' => $owner?->created_at?->diffForHumans(),
-            'listings_count' => $adsCount,
+            'listings_count' => (int) ($owner?->listings_count ?? 0),
             'banner' => $banner
         ];
 
+        $with = ['attributes', 'governorate', 'city'];
+        if ($sec->supportsMakeModel()) {
+            $with[] = 'make';
+            $with[] = 'model';
+        }
+        if ($sec->supportsSections()) {
+            $with[] = 'mainSection';
+            $with[] = 'subSection';
+        }
 
         return (new ListingResource(
-            $listing->load([
-                'attributes',
-                'governorate',
-                'city',
-                'make',
-                'model',
-                'mainSection',
-                'subSection',
-            ])
+            $listing->load($with)
         ))->additional([
             'user' => $userPayload,
+        ]);
+    }
+
+    protected function dispatchViewNotificationAfterResponse(
+        NotificationService $notifications,
+        int $ownerId,
+        int $viewerId,
+        int $listingId,
+        string $sectionName,
+        string $sectionSlug
+    ): void {
+        app()->terminating(function () use ($notifications, $ownerId, $viewerId, $listingId, $sectionName, $sectionSlug) {
+            try {
+                $notifications->dispatch(
+                    $ownerId,
+                    ' تمت مشاهدة إعلانك',
+                    'قام المستخدم #' . $viewerId . ' بمشاهدة إعلانك #' . $listingId . ' في قسم ' . $sectionName,
+                    'view',
+                    [
+                        'viewer_id' => $viewerId,
+                        'listing_id' => $listingId,
+                        'category_slug' => $sectionSlug,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                Log::warning('view_notification_after_response_failed', [
+                    'listing_id' => $listingId,
+                    'owner_id' => $ownerId,
+                    'viewer_id' => $viewerId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
+
+    protected function resolveCategoryBannerPath(string $slug): ?string
+    {
+        return Cache::remember("category_banner_path:{$slug}", now()->addMinutes(10), function () use ($slug) {
+            // 1) Category-specific banner from DB
+            $catBanner = CategoryBanner::query()
+                ->where('slug', $slug)
+                ->where('is_active', true)
+                ->value('banner_path');
+            if (!empty($catBanner)) {
+                return $catBanner;
+            }
+
+            // 2) Unified fallback from DB
+            $unifiedBanner = CategoryBanner::query()
+                ->where('slug', 'unified')
+                ->where('is_active', true)
+                ->value('banner_path');
+            if (!empty($unifiedBanner)) {
+                return $unifiedBanner;
+            }
+
+            // 3) Legacy filesystem fallback
+            $unifiedPath = public_path('storage/uploads/banner/unified');
+            if (File::isDirectory($unifiedPath)) {
+                $files = File::files($unifiedPath);
+                if (!empty($files)) {
+                    return 'storage/uploads/banner/unified/' . $files[0]->getFilename();
+                }
+            }
+
+            return null;
+        });
+    }
+
+    public function trackContactClick(string $section, Listing $listing, Request $request): \Illuminate\Http\JsonResponse
+    {
+        $sec = Section::fromSlug($section);
+        abort_if($listing->category_id !== $sec->id(), 404);
+
+        $data = $request->validate([
+            'type' => ['required', 'string', 'in:whatsapp,call'],
+        ]);
+
+        $column = $data['type'] === 'whatsapp' ? 'whatsapp_clicks' : 'call_clicks';
+        $listing->increment($column, 1);
+        $listing->refresh();
+
+        return response()->json([
+            'success' => true,
+            'listing_id' => (int) $listing->id,
+            'type' => $data['type'],
+            'whatsapp_clicks' => (int) ($listing->whatsapp_clicks ?? 0),
+            'call_clicks' => (int) ($listing->call_clicks ?? 0),
         ]);
     }
 
@@ -686,11 +797,18 @@ class ListingController extends Controller
         }
 
         $perPage = (int) $request->query('per_page', 20);
+        
+        // Normalize Arabic keyword for better matching
+        $normalizedKeyword = Listing::normalizeArabic($keyword);
 
         // Build search condition that covers multiple fields
-        $searchCondition = function ($query) use ($keyword) {
-            $query->where('title', 'like', "%{$keyword}%")
-                ->orWhere('description', 'like', "%{$keyword}%")
+        $searchCondition = function ($query) use ($keyword, $normalizedKeyword) {
+            $query->where(function ($q) use ($normalizedKeyword) {
+                $q->whereNotNull('title')
+                  ->where('title', '!=', '')
+                  ->whereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(title,"أ","ا"),"إ","ا"),"آ","ا"),"ة","ه"),"ى","ي") like ?', ["%{$normalizedKeyword}%"]);
+            })
+                ->orWhereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(description,"أ","ا"),"إ","ا"),"آ","ا"),"ة","ه"),"ى","ي") like ?', ["%{$normalizedKeyword}%"])
                 ->orWhere('address', 'like', "%{$keyword}%")
                 // Search in governorate name
                 ->orWhereHas('governorate', function ($q) use ($keyword) {

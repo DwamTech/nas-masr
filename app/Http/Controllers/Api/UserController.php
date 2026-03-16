@@ -77,8 +77,9 @@ class UserController extends Controller
             }
 
             // Check if referral_code is a valid user ID who is a representative
+            // UPDATED: Now checks is_representative flag instead of role
             $delegateUser = User::where('id', $validated['referral_code'])
-                ->where('role', 'representative')
+                ->where('is_representative', true)
                 ->first();
 
             if (!$delegateUser) {
@@ -387,9 +388,29 @@ class UserController extends Controller
         ], 200);
     }
 
+    public function deleteMyAccount(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+
+        $user->tokens()->delete();
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Account deleted successfully'
+        ], 200);
+    }
+
     //Admin control
     public function blockedUser(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         if ($user->status === 'blocked') {
             $user->update([
                 'status' => 'active'
@@ -429,7 +450,13 @@ class UserController extends Controller
     // Admin: Show user with listings combined
     public function showUserWithListings(User $user, Request $request)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         $user->loadCount('listings');
+        $viewer = $request->user();
+        $canViewClickMetrics = $viewer
+            && (($viewer->role ?? null) === 'admin' || (int) $viewer->id === (int) $user->id);
+        $clickTotals = $canViewClickMetrics ? $this->getUserContactClickTotals($user) : null;
 
         $singleSlug = $request->query('category_slug') ?? $request->query('slug');
         $multiSlugs = $request->query('category_slugs') ?? $request->query('slugs'); // "a,b,c"
@@ -462,12 +489,15 @@ class UserController extends Controller
             ->select([
                 'listings.id',
                 'listings.category_id',
+                'listings.title',  // ✅ إضافة title
                 'listings.main_image',
                 'listings.make_id',
                 'listings.model_id',
                 'listings.price',
                 'listings.rank',
                 'listings.views',
+                'listings.whatsapp_clicks',
+                'listings.call_clicks',
                 'listings.lat',
                 'listings.lng',
                 'listings.contact_phone',
@@ -485,7 +515,7 @@ class UserController extends Controller
 
         $rows = $query->get();
 
-        $items = $rows->map(function ($row) {
+        $items = $rows->map(function ($row) use ($canViewClickMetrics) {
             $attrs = [];
             if ($row->relationLoaded('attributes')) {
                 foreach ($row->attributes as $attr) {
@@ -515,6 +545,9 @@ class UserController extends Controller
                     $supportsSections = $sec->supportsSections(); // ✅ الدالة اللي اتفقنا عليها
                 }
             }
+            
+            // Get category model for unified image fields
+            $cat = $row->category_id ? \App\Models\Category::find($row->category_id) : null;
 
             // ✅ لو القسم ده بيدعم رئيسي/فرعي، نرجّعهم بالاسم
             if ($supportsSections) {
@@ -531,6 +564,7 @@ class UserController extends Controller
                 'attributes' => $attrs,
                 'governorate' => $govName,
                 'city' => $cityName,
+                'title' => $row->title,  // ✅ إضافة title
                 'price' => $row->price,
                 'contact_phone' => $row->contact_phone,
                 'whatsapp_phone' => $row->whatsapp_phone,
@@ -546,7 +580,17 @@ class UserController extends Controller
                 // الكاتيجري
                 'category' => $catSlug,
                 'category_name' => $catName,
+                
+                // Unified category image fields
+                'is_global_image_active' => $cat ? ($cat->is_global_image_active ?? false) : false,
+                'global_image_url' => $cat ? $cat->global_image_url : null,
+                'global_image_full_url' => $cat ? $cat->global_image_full_url : null,
             ];
+
+            if ($canViewClickMetrics) {
+                $data['whatsapp_clicks'] = (int) ($row->whatsapp_clicks ?? 0);
+                $data['call_clicks'] = (int) ($row->call_clicks ?? 0);
+            }
 
             // ✅ لو الكاتيجوري ده بيدعم make/model
             if ($supportsMakeModel) {
@@ -565,7 +609,22 @@ class UserController extends Controller
             return $data;
         })->values();
 
+        $userPayload = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'phone' => $user->phone,
+            'status' => $user->status ?? 'active',
+            'role' => $user->role ?? 'user',
+            'listings_count' => $user->listings_count ?? 0,
+        ];
+
+        if ($canViewClickMetrics && $clickTotals) {
+            $userPayload['whatsapp_clicks'] = $clickTotals['whatsapp_clicks'];
+            $userPayload['call_clicks'] = $clickTotals['call_clicks'];
+        }
+
         return response()->json([
+            'user' => $userPayload,
             'listings' => $items,
             'meta' => ['total' => $items->count()],
         ]);
@@ -594,25 +653,68 @@ class UserController extends Controller
         return json_last_error() === JSON_ERROR_NONE ? $x : $json;
     }
 
+    private function actorIsAdmin(Request $request): bool
+    {
+        $actor = $request->user();
+
+        return $actor ? $actor->isAdmin() : false;
+    }
+
+    private function ensureCanManageStaffAccounts(
+        Request $request,
+        ?User $targetUser = null,
+        ?string $requestedRole = null,
+        bool $touchesDashboardPages = false
+    ): void {
+        if ($this->actorIsAdmin($request)) {
+            return;
+        }
+
+        $requestedRole = is_string($requestedRole) ? trim($requestedRole) : null;
+        $isProtectedTarget = $targetUser?->isPrivilegedDashboardRole() ?? false;
+        $isProtectedRequestedRole = $requestedRole !== null
+            && in_array($requestedRole, User::privilegedDashboardRoles(), true);
+
+        if ($isProtectedTarget || $isProtectedRequestedRole || $touchesDashboardPages) {
+            abort(response()->json([
+                'message' => 'غير مصرح لك بإدارة حسابات فريق الداشبورد أو صلاحياتهم.',
+            ], 403));
+        }
+    }
+
 
     // Admin: Create user
     public function storeUser(Request $request)
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:15', 'unique:users,phone'],
-            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer'])],
+            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer', 'employee'])],
             'status' => ['nullable', Rule::in(['active', 'blocked'])],
             'referral_code' => ['nullable', 'string', 'max:20'],
+            'allowed_dashboard_pages' => ['nullable', 'array'],
+            'allowed_dashboard_pages.*' => ['string', Rule::in(array_keys(config('dashboard_permissions', [])))],
             'password' => ['nullable', 'string', 'min:4', 'max:100'],
         ]);
 
+        $this->ensureCanManageStaffAccounts(
+            $request,
+            null,
+            $data['role'] ?? null,
+            array_key_exists('allowed_dashboard_pages', $data)
+        );
+
         $user = new User();
         $user->name = $data['name'] ?? ($data['phone'] ?? 'User');
+        $user->email = $data['email'] ?? null;
         $user->phone = $data['phone'];
         $user->role = $data['role'] ?? 'user';
         $user->status = $data['status'] ?? 'active';
         $user->referral_code = $data['referral_code'] ?? null;
+        $user->allowed_dashboard_pages = ($user->role ?? null) === 'employee'
+            ? array_values(array_unique($data['allowed_dashboard_pages'] ?? []))
+            : [];
         $user->password = Hash::make($data['password'] ?? '123456');
         $user->save();
 
@@ -629,17 +731,34 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'name' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:15', Rule::unique('users', 'phone')->ignore($user->id)],
-            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer'])],
+            'role' => ['nullable', Rule::in(['user', 'advertiser', 'admin', 'reviewer', 'employee'])],
             'status' => ['nullable', Rule::in(['active', 'blocked'])],
             'referral_code' => ['nullable', 'string', 'max:20'],
+            'allowed_dashboard_pages' => ['nullable', 'array'],
+            'allowed_dashboard_pages.*' => ['string', Rule::in(array_keys(config('dashboard_permissions', [])))],
         ]);
 
-        foreach (['name', 'phone', 'role', 'status', 'referral_code'] as $field) {
+        $this->ensureCanManageStaffAccounts(
+            $request,
+            $user,
+            $data['role'] ?? $user->role,
+            array_key_exists('allowed_dashboard_pages', $data)
+        );
+
+        foreach (['name', 'email', 'phone', 'role', 'status', 'referral_code'] as $field) {
             if (array_key_exists($field, $data)) {
                 $user->{$field} = $data[$field];
             }
         }
+
+        if (array_key_exists('allowed_dashboard_pages', $data) || ($data['role'] ?? $user->role) !== 'employee') {
+            $user->allowed_dashboard_pages = ($data['role'] ?? $user->role) === 'employee'
+                ? array_values(array_unique($data['allowed_dashboard_pages'] ?? []))
+                : [];
+        }
+
         $user->save();
 
         $user->loadCount('listings');
@@ -650,8 +769,10 @@ class UserController extends Controller
     }
 
     // Admin: Delete user
-    public function deleteUser(User $user)
+    public function deleteUser(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         // revoke tokens then delete
         $user->tokens()->delete();
         $user->delete();
@@ -662,16 +783,37 @@ class UserController extends Controller
     // Helper: format user output consistently
     private function formatUserSummary(User $user): array
     {
+        $totals = $this->getUserContactClickTotals($user);
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'phone' => $user->phone,
+            'email' => $user->email,
             'user_code' => (string) $user->id,
             'delegate_code' => $user->referral_code,
             'status' => $user->status ?? 'active',
             'registered_at' => optional($user->created_at)->toDateString(),
             'listings_count' => $user->listings_count ?? $user->listings()->count(),
+            'whatsapp_clicks' => $totals['whatsapp_clicks'],
+            'call_clicks' => $totals['call_clicks'],
             'role' => $user->role ?? 'user',
+            'allowed_dashboard_pages' => $user->dashboardPageKeys(),
+            'profile_image_url' => $user->profile_image_url,
+        ];
+    }
+
+    private function getUserContactClickTotals(User $user): array
+    {
+        $totals = Listing::query()
+            ->where('user_id', $user->id)
+            ->selectRaw('COALESCE(SUM(whatsapp_clicks), 0) as whatsapp_clicks')
+            ->selectRaw('COALESCE(SUM(call_clicks), 0) as call_clicks')
+            ->first();
+
+        return [
+            'whatsapp_clicks' => (int) ($totals->whatsapp_clicks ?? 0),
+            'call_clicks' => (int) ($totals->call_clicks ?? 0),
         ];
     }
 
@@ -777,8 +919,10 @@ class UserController extends Controller
 
 
     //create admin otp
-    public function createOtp(User $user)
+    public function createOtp(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         // $user = Request()->user();
         // if ($user->role == 'advertiser' || $user->role == 'user' || $user->role == 'representative'){
 
@@ -937,8 +1081,10 @@ class UserController extends Controller
      * Admin: Get all clients for a specific representative.
      * GET /api/admin/delegates/{user}/clients
      */
-    public function delegateClients(User $user)
+    public function delegateClients(Request $request, User $user)
     {
+        $this->ensureCanManageStaffAccounts($request, $user);
+
         // Find the client relationship record for this user (representative)
         $userClient = UserClient::where('user_id', $user->id)->first();
 

@@ -35,6 +35,26 @@ class CategoryFieldsSeeder extends Seeder
         $carsRentFields = [
             [
                 'category_slug' => 'cars_rent',
+                'field_name' => 'brand',
+                'display_name' => 'الماركة',
+                'type' => 'string',
+                'options' => [], // Loaded dynamically from /api/makes
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 1,
+            ],
+            [
+                'category_slug' => 'cars_rent',
+                'field_name' => 'model',
+                'display_name' => 'الموديل',
+                'type' => 'string',
+                'options' => [], // Loaded dynamically per make from /api/makes
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 2,
+            ],
+            [
+                'category_slug' => 'cars_rent',
                 'field_name' => 'year',
                 'display_name' => 'السنة',
                 'type' => 'string',
@@ -133,13 +153,33 @@ class CategoryFieldsSeeder extends Seeder
         $carFields = [
             [
                 'category_slug' => 'cars',
+                'field_name' => 'brand',
+                'display_name' => 'الماركة',
+                'type' => 'string',
+                'options' => [], // Loaded dynamically from /api/makes
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 1,
+            ],
+            [
+                'category_slug' => 'cars',
+                'field_name' => 'model',
+                'display_name' => 'الموديل',
+                'type' => 'string',
+                'options' => [], // Loaded dynamically per make from /api/makes
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 2,
+            ],
+            [
+                'category_slug' => 'cars',
                 'field_name' => 'year',
                 'display_name' => 'السنة',
                 'type' => 'string',
                 'options' => array_merge(range(1990, 2025), ['غير ذلك']),
                 'required' => true,
                 'filterable' => true,
-                'sort_order' => 1,
+                'sort_order' => 3,
             ],
             [
                 'category_slug' => 'cars',
@@ -147,16 +187,16 @@ class CategoryFieldsSeeder extends Seeder
                 'display_name' => 'الكيلو متر',
                 'type' => 'string',
                 'options' => [
-                    '0 - 10،000',
-                    '10،000 - 50،000',
-                    '50،000 - 100،000',
-                    '100،000 - 200،000',
-                    'أكثر من 200،000',
+                    '0 - 10,000',
+                    '10,000 - 50,000',
+                    '50,000 - 100,000',
+                    '100,000 - 200,000',
+                    'أكثر من 200,000',
                     'غير ذلك'
                 ],
                 'required' => true,
                 'filterable' => true,
-                'sort_order' => 2,
+                'sort_order' => 4,
             ],
             [
                 'category_slug' => 'cars',
@@ -166,7 +206,7 @@ class CategoryFieldsSeeder extends Seeder
                 'options' => ['بنزين', 'ديزل', 'غاز', 'كهرباء', 'غير ذلك'],
                 'required' => true,
                 'filterable' => true,
-                'sort_order' => 3,
+                'sort_order' => 5,
             ],
             [
                 'category_slug' => 'cars',
@@ -176,7 +216,7 @@ class CategoryFieldsSeeder extends Seeder
                 'options' => ['أوتوماتيك', 'مانيوال', 'غير ذلك'],
                 'required' => true,
                 'filterable' => true,
-                'sort_order' => 4,
+                'sort_order' => 6,
             ],
             [
                 'category_slug' => 'cars',
@@ -186,7 +226,7 @@ class CategoryFieldsSeeder extends Seeder
                 'options' => ['أبيض', 'أسود', 'أزرق', 'رمادي', 'فضي', 'أحمر', 'غير ذلك'],
                 'required' => true,
                 'filterable' => true,
-                'sort_order' => 5,
+                'sort_order' => 7,
             ],
             [
                 'category_slug' => 'cars',
@@ -205,7 +245,31 @@ class CategoryFieldsSeeder extends Seeder
                 ],
                 'required' => true,
                 'filterable' => true,
-                'sort_order' => 6,
+                'sort_order' => 8,
+            ],
+        ];
+
+        // 🔹 حقول قطع غيار سيارات
+        $sparePartsFields = [
+            [
+                'category_slug' => 'spare-parts',
+                'field_name' => 'brand',
+                'display_name' => 'الماركة',
+                'type' => 'string',
+                'options' => [], // Loaded dynamically from /api/makes
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 1,
+            ],
+            [
+                'category_slug' => 'spare-parts',
+                'field_name' => 'model',
+                'display_name' => 'الموديل',
+                'type' => 'string',
+                'options' => [], // Loaded dynamically per make from /api/makes
+                'required' => true,
+                'filterable' => true,
+                'sort_order' => 2,
             ],
         ];
 
@@ -296,6 +360,7 @@ class CategoryFieldsSeeder extends Seeder
             $realEstateFields,
             $carFields,
             $carsRentFields,
+            $sparePartsFields,
             $jobsFields,
             $teachersFields,
             $doctorsFields,

@@ -55,8 +55,9 @@ class AuthController extends Controller
 
             if (!empty($data['referral_code'])) {
                 // Check if referral_code is a valid user ID who is a representative
+                // UPDATED: Now checks is_representative flag instead of role
                 $delegateUser = User::where('id', $data['referral_code'])
-                    ->where('role', 'representative')
+                    ->where('is_representative', true)
                     ->first();
 
                 if (!$delegateUser) {
@@ -107,13 +108,63 @@ class AuthController extends Controller
 
 
     // admin change  password
-    public function changePass(User $user)
+    public function changePass(Request $request, User $user)
     {
+        $actor = $request->user();
+
+        if ($actor && !$actor->isAdmin() && $user->isPrivilegedDashboardRole()) {
+            return response()->json([
+                'message' => 'غير مصرح لك بتعديل حسابات فريق الداشبورد.',
+            ], 403);
+        }
+
         $user->password = Hash::make('123456');
 
         $user->save();
         return response()->json([
             'message' => 'مرحبًا ' . $user->name . '، تم تغيير كلمة السر الخاصة بحسابك إلى: 123456. يرجى تسجيل الدخول وتغييرها بعد أول دخول. فريق ناس مصر',
+        ]);
+    }
+
+    // admin change own password using current password
+    public function changeOwnPassword(Request $request)
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        $admin = $request->user();
+
+        if (!$admin || strtolower((string) $admin->role) !== 'admin') {
+            return response()->json([
+                'message' => 'غير مصرح لك بتنفيذ هذا الإجراء',
+            ], 403);
+        }
+
+        if (!Hash::check($data['current_password'], $admin->password)) {
+            return response()->json([
+                'message' => 'كلمة المرور الحالية غير صحيحة',
+                'errors' => [
+                    'current_password' => ['كلمة المرور الحالية غير صحيحة'],
+                ],
+            ], 422);
+        }
+
+        if (Hash::check($data['new_password'], $admin->password)) {
+            return response()->json([
+                'message' => 'كلمة المرور الجديدة يجب أن تختلف عن الحالية',
+                'errors' => [
+                    'new_password' => ['كلمة المرور الجديدة يجب أن تختلف عن الحالية'],
+                ],
+            ], 422);
+        }
+
+        $admin->password = Hash::make($data['new_password']);
+        $admin->save();
+
+        return response()->json([
+            'message' => 'تم تغيير كلمة المرور بنجاح',
         ]);
     }
 }

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use App\Support\Section;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 
 
@@ -40,7 +41,7 @@ class BestAdvertiserController extends Controller
         $idsStr = implode(',', $userIds);
 
         // Get max listings count from settings, default to 8
-        $maxListings = Cache::remember('settings:featured_user_max_ads', now()->addHours(6), function () {
+        $maxListings = $this->safeRemember('settings:featured_user_max_ads', now()->addHours(6), function () {
             return (int) (SystemSetting::where('key', 'featured_user_max_ads')->value('value') ?? 8);
         });
 
@@ -94,10 +95,13 @@ class BestAdvertiserController extends Controller
                 $lSec = $listing->category_id ? Section::fromId($listing->category_id) : null;
                 $catSlug = $lSec?->slug ?? null;
                 $catName = $lSec?->name ?? null;
+                
+                // Get category model for unified image fields
+                $category = $listing->category_id ? Category::find($listing->category_id) : null;
 
                 $byUser[$row->user_id][] = [
                     'main_image_url' => ($section === 'jobs' || $section === 'doctors' || $section === 'teachers')
-                        ? ( asset('storage/' . \Illuminate\Support\Facades\Cache::remember("settings:{$section}_default_image", now()->addHours(6), fn() => \App\Models\SystemSetting::where('key', "{$section}_default_image")->value('value') ?? "defaults/{$section}_default.png")) )
+                        ? (asset('storage/' . $this->safeRemember("settings:{$section}_default_image", now()->addHours(6), fn() => \App\Models\SystemSetting::where('key', "{$section}_default_image")->value('value') ?? "defaults/{$section}_default.png")))
                         : ($listing->main_image ? asset('storage/' . $listing->main_image) : null),
                     'governorate'    => $govName,
                     'city'           => $cityName,
@@ -112,6 +116,11 @@ class BestAdvertiserController extends Controller
                     // ✅ الكاتيجري بالإنجليزي (slug) وبالعربي (name)
                     'category'       => $catSlug,
                     'category_name'  => $catName,
+                    
+                    // Unified category image fields
+                    'is_global_image_active' => $category->is_global_image_active ?? false,
+                    'global_image_url' => $category->global_image_url,
+                    'global_image_full_url' => $category->global_image_full_url,
                 ];
             }
         }
@@ -183,7 +192,7 @@ class BestAdvertiserController extends Controller
             ], 422);
         }
 
-        $limit = Cache::rememberForever('settings:featured_users_count', function () {
+        $limit = $this->safeRememberForever('settings:featured_users_count', function () {
             return (int) (SystemSetting::where('key', 'featured_users_count')->value('value') ?? 8);
         });
 
@@ -229,6 +238,30 @@ class BestAdvertiserController extends Controller
             ]
         ], $ba->wasRecentlyCreated ? 201 : 200);
     }
+    public function show($userId)
+    {
+        $bestAdvertiser = BestAdvertiser::where('user_id', $userId)->first();
+
+        if (!$bestAdvertiser) {
+            return response()->json([
+                'message' => 'Best advertiser not found',
+                'data' => null
+            ], 404);
+        }
+
+        $categories = Category::whereIn('id', $bestAdvertiser->category_ids)->get(['id', 'name', 'slug']);
+
+        return response()->json([
+            'data' => [
+                'id' => $bestAdvertiser->id,
+                'user_id' => $bestAdvertiser->user_id,
+                'category_ids' => $bestAdvertiser->category_ids,
+                'is_active' => $bestAdvertiser->is_active,
+                'categories' => $categories,
+            ]
+        ]);
+    }
+
 
 
 
@@ -246,4 +279,30 @@ class BestAdvertiserController extends Controller
     //     $bestAdvertiser->delete();
     //     return response()->json(['message' => 'Best advertiser deleted']);
     // }
+
+    private function safeRemember(string $key, $ttl, callable $resolver)
+    {
+        try {
+            return Cache::remember($key, $ttl, $resolver);
+        } catch (\Throwable $e) {
+            Log::warning('cache_fallback_in_best_advertiser', [
+                'key' => $key,
+                'error' => $e->getMessage(),
+            ]);
+            return $resolver();
+        }
+    }
+
+    private function safeRememberForever(string $key, callable $resolver)
+    {
+        try {
+            return Cache::rememberForever($key, $resolver);
+        } catch (\Throwable $e) {
+            Log::warning('cache_fallback_in_best_advertiser_forever', [
+                'key' => $key,
+                'error' => $e->getMessage(),
+            ]);
+            return $resolver();
+        }
+    }
 }

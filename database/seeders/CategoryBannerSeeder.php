@@ -51,6 +51,8 @@ class CategoryBannerSeeder extends Seeder
             'heavy-transport',
             'tools',
             'missing',
+            'payment_single_ad_methods',
+            'payment_packages_subscribe',
             'unified'
         ];
 

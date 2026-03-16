@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Governorate;
 use App\Models\City;
 use Illuminate\Http\Request;
+use App\Support\DashboardFilterListsCache;
 
 class GovernorateController extends Controller
 {
     public function index()
     {
-        $items = Governorate::with('cities')->orderBy('name')->get();
+        $items = Governorate::with('cities')->orderBy('sort_order')->orderBy('name')->get();
         $items->push((object)[
             'id' => null,
             'name' => 'غير ذلك',
@@ -34,6 +35,8 @@ class GovernorateController extends Controller
             'governorate_id' => $gov->id,
         ]);
 
+        DashboardFilterListsCache::flushGovernorates();
+
         return response()->json($gov->load('cities'), 201);
     }
     public function storCities(Request $request, Governorate $governorate)
@@ -46,6 +49,8 @@ class GovernorateController extends Controller
             'name' => $data['name'],
             'governorate_id' => $governorate->id,
         ]);
+
+        DashboardFilterListsCache::flushGovernorates();
 
         return response()->json($city, 201);
     }
@@ -60,7 +65,16 @@ class GovernorateController extends Controller
             $governorate->update(['name' => $data['name']]);
         }
 
+        DashboardFilterListsCache::flushGovernorates();
+
         return response()->json($governorate->load('cities'));
+    }
+
+    public function showGov(Governorate $governorate)
+    {
+        return response()->json(
+            $governorate->load(['cities' => fn ($query) => $query->orderBy('sort_order')->orderBy('name')])
+        );
     }
 
     public function destroyGov(Governorate $governorate)
@@ -76,6 +90,8 @@ class GovernorateController extends Controller
 
         $governorate->delete();
 
+        DashboardFilterListsCache::flushGovernorates();
+
         return response()->json([
             'success' => true,
             'message' => 'تم حذف المحافظة بنجاح'
@@ -85,7 +101,7 @@ class GovernorateController extends Controller
 
     public function cities(Governorate $governorate)
     {
-        $cities = $governorate->cities()->orderBy('name')->get();
+        $cities = $governorate->cities()->orderBy('sort_order')->orderBy('name')->get();
         $cities->push((object)[
             'id' => null,
             'name' => 'غير ذلك',
@@ -116,6 +132,7 @@ class GovernorateController extends Controller
         ]);
 
         $city->update($data);
+        DashboardFilterListsCache::flushGovernorates();
         return response()->json($city);
     }
 
@@ -132,11 +149,48 @@ class GovernorateController extends Controller
         }
 
         $city->delete();
+        DashboardFilterListsCache::flushGovernorates();
 
         return response()->json([
             'success' => true,
             'message' => 'تم حذف المدينة بنجاح.',
         ], 200);
+    }
+
+    // POST /api/admin/governorates/ranks
+    public function updateGovRanks(Request $request)
+    {
+        $data = $request->validate([
+            'ranks' => 'required|array',
+            'ranks.*.id' => 'required|integer|exists:governorates,id',
+            'ranks.*.rank' => 'required|integer|min:0',
+        ]);
+
+        foreach ($data['ranks'] as $item) {
+            Governorate::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
+        }
+
+        DashboardFilterListsCache::flushGovernorates();
+
+        return response()->json(['message' => 'تم تحديث ترتيب المحافظات بنجاح']);
+    }
+
+    // POST /api/admin/cities/ranks
+    public function updateCityRanks(Request $request)
+    {
+        $data = $request->validate([
+            'ranks' => 'required|array',
+            'ranks.*.id' => 'required|integer|exists:cities,id',
+            'ranks.*.rank' => 'required|integer|min:0',
+        ]);
+
+        foreach ($data['ranks'] as $item) {
+            City::where('id', $item['id'])->update(['sort_order' => $item['rank']]);
+        }
+
+        DashboardFilterListsCache::flushGovernorates();
+
+        return response()->json(['message' => 'تم تحديث ترتيب المدن بنجاح']);
     }
 
     /**
@@ -175,4 +229,3 @@ class GovernorateController extends Controller
         ]);
     }
 }
-

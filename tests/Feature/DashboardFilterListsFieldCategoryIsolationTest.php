@@ -1,0 +1,306 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+class DashboardFilterListsFieldCategoryIsolationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_admin_and_employee_with_categories_filters_can_read_dashboard_field_category(): void
+    {
+        $ctx = $this->seedFieldCategoryData();
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'allowed_dashboard_pages' => ['categories.filters'],
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/filter-lists/field-category?category_slug=spare-parts')
+            ->assertOk()
+            ->assertJsonPath('supports_make_model', true)
+            ->assertJsonPath('supports_sections', true)
+            ->assertJsonPath('data.0.field_name', 'condition')
+            ->assertJsonPath('data.0.options.0', 'مستعمل')
+            ->assertJsonPath('data.0.options.1', 'جديد')
+            ->assertJsonPath('makes.0.name', 'تويوتا')
+            ->assertJsonPath('makes.0.models.0.name', 'كورولا')
+            ->assertJsonPath('main_sections.0.name', 'محركات')
+            ->assertJsonFragment([
+                'id' => $ctx['sub_section_id'],
+                'name' => 'ديزل',
+            ]);
+
+        $this->actingAs($employee)
+            ->getJson('/api/admin/filter-lists/field-category?category_slug=spare-parts')
+            ->assertOk()
+            ->assertJsonPath('supports_make_model', true)
+            ->assertJsonPath('supports_sections', true);
+    }
+
+    public function test_employee_without_categories_filters_permission_is_blocked_from_dashboard_field_category(): void
+    {
+        $this->seedFieldCategoryData();
+
+        $employee = User::factory()->create([
+            'role' => 'employee',
+            'allowed_dashboard_pages' => ['dashboard.home'],
+        ]);
+
+        $this->actingAs($employee)
+            ->getJson('/api/admin/filter-lists/field-category?category_slug=spare-parts')
+            ->assertStatus(403);
+    }
+
+    public function test_public_category_fields_route_remains_unchanged(): void
+    {
+        $this->seedFieldCategoryData();
+
+        $this->getJson('/api/category-fields?category_slug=spare-parts')
+            ->assertOk()
+            ->assertJsonPath('supports_make_model', true)
+            ->assertJsonPath('supports_sections', true)
+            ->assertJsonPath('data.0.field_name', 'condition');
+    }
+
+    public function test_dashboard_field_category_route_uses_reasonable_query_count(): void
+    {
+        $this->seedFieldCategoryData();
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $queries = 0;
+
+        DB::listen(function () use (&$queries) {
+            $queries++;
+        });
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/filter-lists/field-category?category_slug=spare-parts')
+            ->assertOk();
+
+        $this->assertLessThan(
+            30,
+            $queries,
+            "Expected optimized dashboard field-category endpoint to stay under 30 queries, got {$queries}."
+        );
+    }
+
+    protected function seedFieldCategoryData(): array
+    {
+        DB::table('categories')->insert([
+            [
+                'id' => 1,
+                'slug' => 'cars',
+                'name' => 'سيارات',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => 2,
+                'slug' => 'spare-parts',
+                'name' => 'قطع غيار سيارات',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        DB::table('category_fields')->insert([
+            [
+                'category_slug' => 'spare-parts',
+                'field_name' => 'condition',
+                'display_name' => 'الحالة',
+                'type' => 'select',
+                'required' => false,
+                'filterable' => true,
+                'options' => json_encode(['جديد', 'مستعمل', 'غير ذلك'], JSON_UNESCAPED_UNICODE),
+                'rules_json' => json_encode([]),
+                'is_active' => true,
+                'sort_order' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_slug' => 'spare-parts',
+                'field_name' => 'brand',
+                'display_name' => 'الماركة',
+                'type' => 'select',
+                'required' => false,
+                'filterable' => true,
+                'options' => json_encode(['تويوتا', 'نيسان', 'غير ذلك'], JSON_UNESCAPED_UNICODE),
+                'rules_json' => json_encode([]),
+                'is_active' => true,
+                'sort_order' => 2,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_slug' => 'spare-parts',
+                'field_name' => 'model',
+                'display_name' => 'الموديل',
+                'type' => 'select',
+                'required' => false,
+                'filterable' => true,
+                'options' => json_encode(['كورولا', 'صني', 'غير ذلك'], JSON_UNESCAPED_UNICODE),
+                'rules_json' => json_encode([]),
+                'is_active' => true,
+                'sort_order' => 3,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $toyotaId = DB::table('makes')->insertGetId([
+            'name' => 'تويوتا',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $nissanId = DB::table('makes')->insertGetId([
+            'name' => 'نيسان',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('models')->insert([
+            [
+                'make_id' => $toyotaId,
+                'name' => 'كورولا',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'make_id' => $nissanId,
+                'name' => 'صني',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $mainSectionId = DB::table('category_main_sections')->insertGetId([
+            'category_id' => 2,
+            'name' => 'محركات',
+            'title' => 'محركات',
+            'sort_order' => 2,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('category_main_sections')->insert([
+            'category_id' => 2,
+            'name' => 'إكسسوارات',
+            'title' => 'إكسسوارات',
+            'sort_order' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $subSectionId = DB::table('category_sub_section')->insertGetId([
+            'category_id' => 2,
+            'main_section_id' => $mainSectionId,
+            'name' => 'ديزل',
+            'title' => 'ديزل',
+            'sort_order' => 1,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('category_field_option_ranks')->insert([
+            [
+                'category_id' => 2,
+                'field_name' => 'condition',
+                'option_value' => 'مستعمل',
+                'rank' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 2,
+                'field_name' => 'condition',
+                'option_value' => 'جديد',
+                'rank' => 2,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 1,
+                'field_name' => 'brand',
+                'option_value' => 'تويوتا',
+                'rank' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 1,
+                'field_name' => 'brand',
+                'option_value' => 'نيسان',
+                'rank' => 2,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 1,
+                'field_name' => "model_make_id_{$toyotaId}",
+                'option_value' => 'كورولا',
+                'rank' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 1,
+                'field_name' => "model_make_id_{$nissanId}",
+                'option_value' => 'صني',
+                'rank' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 2,
+                'field_name' => 'MainSection',
+                'option_value' => 'محركات',
+                'rank' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 2,
+                'field_name' => 'MainSection',
+                'option_value' => 'إكسسوارات',
+                'rank' => 2,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'category_id' => 2,
+                'field_name' => 'SubSection_محركات',
+                'option_value' => 'ديزل',
+                'rank' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        return [
+            'toyota_id' => $toyotaId,
+            'nissan_id' => $nissanId,
+            'main_section_id' => $mainSectionId,
+            'sub_section_id' => $subSectionId,
+        ];
+    }
+}
