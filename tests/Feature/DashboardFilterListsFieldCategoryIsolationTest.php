@@ -126,6 +126,108 @@ class DashboardFilterListsFieldCategoryIsolationTest extends TestCase
             ->assertJsonPath('data.0.options.1', 'جديد');
     }
 
+    public function test_hidden_automotive_options_are_excluded_from_public_category_fields_reads(): void
+    {
+        $ctx = $this->seedFieldCategoryData();
+
+        DB::table('makes')
+            ->where('id', $ctx['nissan_id'])
+            ->update(['is_active' => false]);
+
+        DB::table('models')
+            ->where('make_id', $ctx['toyota_id'])
+            ->where('name', 'كورولا')
+            ->update(['is_active' => false]);
+
+        $response = $this->getJson('/api/category-fields?category_slug=spare-parts')
+            ->assertOk();
+
+        $makes = $response->json('makes');
+
+        $this->assertIsArray($makes);
+        $this->assertSame(['تويوتا', 'غير ذلك'], array_column($makes, 'name'));
+        $this->assertSame(['غير ذلك'], array_column($makes[0]['models'], 'name'));
+    }
+
+    public function test_hidden_governorates_and_sections_are_excluded_from_public_category_fields_reads(): void
+    {
+        $this->seedFieldCategoryData();
+
+        DB::table('governorates')->insert([
+            [
+                'name' => 'القاهرة',
+                'sort_order' => 1,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'name' => 'الجيزة',
+                'sort_order' => 2,
+                'is_active' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $cairoId = DB::table('governorates')->where('name', 'القاهرة')->value('id');
+        $gizaId = DB::table('governorates')->where('name', 'الجيزة')->value('id');
+
+        DB::table('cities')->insert([
+            [
+                'name' => 'مدينة نصر',
+                'governorate_id' => $cairoId,
+                'sort_order' => 1,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'name' => 'الدقي',
+                'governorate_id' => $cairoId,
+                'sort_order' => 2,
+                'is_active' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'name' => 'الهرم',
+                'governorate_id' => $gizaId,
+                'sort_order' => 1,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        DB::table('category_sub_section')->insert([
+            'category_id' => 2,
+            'main_section_id' => 1,
+            'name' => 'بنزين',
+            'title' => 'بنزين',
+            'sort_order' => 2,
+            'is_active' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('category_main_sections')->where('category_id', 2)->where('name', 'إكسسوارات')->update([
+            'is_active' => false,
+        ]);
+
+        $response = $this->getJson('/api/category-fields?category_slug=spare-parts')
+            ->assertOk();
+
+        $governorates = $response->json('governorates');
+        $mainSections = $response->json('main_sections');
+
+        $this->assertSame(['القاهرة'], array_column($governorates, 'name'));
+        $this->assertSame(['مدينة نصر'], array_column($governorates[0]['cities'], 'name'));
+
+        $this->assertSame(['محركات'], array_column($mainSections, 'name'));
+        $this->assertSame(['ديزل'], array_column($mainSections[0]['sub_sections'], 'name'));
+    }
+
     protected function seedFieldCategoryData(): array
     {
         DB::table('categories')->insert([

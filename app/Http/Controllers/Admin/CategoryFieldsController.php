@@ -110,80 +110,12 @@ class CategoryFieldsController extends Controller
         $supportsSections = $section?->supportsSections() ?? false; // ✅ جديد
 
         $makes = [];
-        if ($supportsMakeModel) {
-            $makes = Make::with('models')->get();
-            
-            // معالجة الماركات والموديلات (الترتيب سيتم في الفرونت إند)
-            $makesArray = [];
-            foreach ($makes as $make) {
-                $modelNames = $make->models->pluck('name')->toArray();
-                
-                // Sort models by rank if ranks exist
-                if ($category) {
-                    $modelNames = $this->sortOptionsByRankWithCategoryFallback(
-                        (int) $category->id,
-                        $automotiveFallbackCategoryId ? (int) $automotiveFallbackCategoryId : null,
-                        [
-                            "model_make_id_{$make->id}",
-                            "car_model_make_id_{$make->id}",
-                            'model_' . $this->normalizeRankToken($make->name),
-                            'car_model_' . $this->normalizeRankToken($make->name),
-                            "model_{$make->name}",
-                            "car_model_{$make->name}",
-                            "Model_{$make->name}",
-                            "CarModel_{$make->name}",
-                            "model::{$make->name}",
-                            "car_model::{$make->name}",
-                            'model',
-                            'Model',
-                            'car_model',
-                            'CarModel',
-                        ],
-                        $modelNames
-                    );
-                }
-                
-                // معالجة الموديلات لضمان "غير ذلك" في الآخر
-                $orderedModelNames = OptionsHelper::processOptions($modelNames, false, false);
-                $modelsByName = $make->models->keyBy('name');
-                $orderedModels = collect($orderedModelNames)
-                    ->values()
-                    ->map(function ($modelName, $idx) use ($modelsByName) {
-                        $model = $modelsByName->get($modelName);
-                        return [
-                            'id' => $model?->id,
-                            'name' => $modelName,
-                            'rank' => $idx + 1,
-                        ];
-                    })
-                    ->all();
-
-                $makesArray[$make->name] = [
-                    'id' => $make->id,
-                    'models' => $orderedModels,
-                ];
-            }
-            
-            // Sort makes by rank if ranks exist
-            $makeNames = array_keys($makesArray);
-            if ($category) {
-                $makeNames = $this->sortOptionsByRankWithCategoryFallback(
-                    (int) $category->id,
-                    $automotiveFallbackCategoryId ? (int) $automotiveFallbackCategoryId : null,
-                    ['brand', 'Brand', 'make', 'Make', 'car_make', 'CarMake'],
-                    $makeNames
-                );
-            }
-            
-            // تحويل للصيغة المطلوبة للفرونت إند
-            $makes = collect($makeNames)->values()->map(function ($makeName, $idx) use ($makesArray) {
-                return [
-                    'id' => $makesArray[$makeName]['id'] ?? null,
-                    'name' => $makeName,
-                    'rank' => $idx + 1,
-                    'models' => $makesArray[$makeName]['models'] ?? [],
-                ];
-            })->values()->all();
+        if ($supportsMakeModel && $category) {
+            $makes = $this->buildAutomotivePayload(
+                (int) $category->id,
+                $automotiveFallbackCategoryId ? (int) $automotiveFallbackCategoryId : null,
+                $includeHidden
+            );
         }
 
         $mainSections = [];
@@ -616,6 +548,107 @@ class CategoryFieldsController extends Controller
             return '';
         }
         return strtolower($v);
+    }
+
+    /**
+     * Build make/model payload while respecting hidden state and preserving mobile response shape.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildAutomotivePayload(int $primaryCategoryId, ?int $fallbackCategoryId, bool $includeInactive = false): array
+    {
+        $items = Make::query()
+            ->select(['id', 'name', 'is_active'])
+            ->with([
+                'models' => function ($query) use ($includeInactive) {
+                    $query->select(['id', 'name', 'make_id', 'is_active'])
+                        ->when(! $includeInactive, fn ($modelQuery) => $modelQuery->where('is_active', true));
+                },
+            ])
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
+            ->get();
+
+        $makes = [];
+
+        foreach ($items as $make) {
+            $modelNames = $make->models->pluck('name')->toArray();
+            $modelNames = $this->sortOptionsByRankWithCategoryFallback(
+                $primaryCategoryId,
+                $fallbackCategoryId,
+                [
+                    "model_make_id_{$make->id}",
+                    "car_model_make_id_{$make->id}",
+                    'model_' . $this->normalizeRankToken($make->name),
+                    'car_model_' . $this->normalizeRankToken($make->name),
+                    "model_{$make->name}",
+                    "car_model_{$make->name}",
+                    "Model_{$make->name}",
+                    "CarModel_{$make->name}",
+                    "model::{$make->name}",
+                    "car_model::{$make->name}",
+                    'model',
+                    'Model',
+                    'car_model',
+                    'CarModel',
+                ],
+                $modelNames
+            );
+
+            $orderedModelNames = OptionsHelper::processOptions($modelNames, false, false);
+            $modelsByName = $make->models->keyBy('name');
+
+            $makes[] = [
+                'id' => $make->id,
+                'name' => $make->name,
+                'models' => collect($orderedModelNames)
+                    ->values()
+                    ->map(function ($modelName, $idx) use ($modelsByName) {
+                        $model = $modelsByName->get($modelName);
+
+                        return [
+                            'id' => $model?->id,
+                            'name' => $modelName,
+                            'rank' => $idx + 1,
+                        ];
+                    })
+                    ->all(),
+            ];
+        }
+
+        $makeNames = array_values(array_map(fn (array $row) => (string) $row['name'], $makes));
+        $sortedNames = $this->sortOptionsByRankWithCategoryFallback(
+            $primaryCategoryId,
+            $fallbackCategoryId,
+            ['brand', 'Brand', 'make', 'Make', 'car_make', 'CarMake'],
+            $makeNames
+        );
+
+        $byName = collect($makes)->keyBy('name');
+        $sortedMakes = [];
+
+        foreach ($sortedNames as $name) {
+            if ($byName->has($name)) {
+                $sortedMakes[] = $byName->get($name);
+                $byName->forget($name);
+            }
+        }
+
+        foreach ($byName->values() as $row) {
+            $sortedMakes[] = $row;
+        }
+
+        $payload = collect($sortedMakes)->values()->map(function (array $row, int $idx) {
+            $row['rank'] = $idx + 1;
+            return $row;
+        })->all();
+
+        $payload[] = [
+            'id' => null,
+            'name' => OptionsHelper::OTHER_OPTION,
+            'models' => [],
+        ];
+
+        return $payload;
     }
 
     /**
