@@ -19,6 +19,7 @@ class CategorySectionsController extends Controller
     public function index(Request $request)
     {
         $slug = $request->query('category_slug');
+        $includeInactive = $request->boolean('include_inactive', false);
 
         if (!$slug) {
             return response()->json([
@@ -35,13 +36,13 @@ class CategorySectionsController extends Controller
         }
 
         $mainSections = CategoryMainSection::with([
-            'subSections' => function ($q) {
-                $q->where('is_active', true)
+            'subSections' => function ($q) use ($includeInactive) {
+                $q->when(! $includeInactive, fn ($subQuery) => $subQuery->where('is_active', true))
                     ->orderBy('sort_order');
             }
         ])
             ->where('category_id', $category->id)
-            ->where('is_active', true)
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
             ->orderBy('sort_order')
             ->get();
 
@@ -92,7 +93,11 @@ class CategorySectionsController extends Controller
 
     public function subSections(CategoryMainSection $mainSection)
     {
-        $subSections = $mainSection->subSections()->orderBy('sort_order')->get();
+        $includeInactive = request()->boolean('include_inactive', false);
+        $subSections = $mainSection->subSections()
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
+            ->orderBy('sort_order')
+            ->get();
         $subSections->push((object)[
             'id' => null,
             'name' => 'غير ذلك',
@@ -360,5 +365,41 @@ class CategorySectionsController extends Controller
         }
 
         return response()->json(['message' => 'Ranks updated successfully']);
+    }
+
+    public function setMainVisibility(Request $request, CategoryMainSection $mainSection)
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $mainSection->update(['is_active' => $data['is_active']]);
+
+        if (! $data['is_active']) {
+            $mainSection->subSections()->update(['is_active' => false]);
+        }
+
+        $categorySlug = (string) Category::where('id', $mainSection->category_id)->value('slug');
+        if ($categorySlug !== '') {
+            DashboardFilterListsCache::flushSections($categorySlug, (int) $mainSection->id);
+        }
+
+        return response()->json($mainSection->fresh()->load('subSections'));
+    }
+
+    public function setSubVisibility(Request $request, CategorySubSection $subSection)
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $subSection->update(['is_active' => $data['is_active']]);
+
+        $categorySlug = (string) Category::where('id', $subSection->category_id)->value('slug');
+        if ($categorySlug !== '') {
+            DashboardFilterListsCache::flushSections($categorySlug, (int) $subSection->main_section_id);
+        }
+
+        return response()->json($subSection->fresh());
     }
 }

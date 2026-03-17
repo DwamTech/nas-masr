@@ -12,7 +12,15 @@ class GovernorateController extends Controller
 {
     public function index()
     {
-        $items = Governorate::with('cities')->orderBy('sort_order')->orderBy('name')->get();
+        $items = Governorate::query()
+            ->active()
+            ->with([
+                'cities' => fn ($query) => $query->active()->orderBy('sort_order')->orderBy('name'),
+            ])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
         $items->push((object)[
             'id' => null,
             'name' => 'غير ذلك',
@@ -101,7 +109,16 @@ class GovernorateController extends Controller
 
     public function cities(Governorate $governorate)
     {
-        $cities = $governorate->cities()->orderBy('sort_order')->orderBy('name')->get();
+        if (! $governorate->is_active) {
+            return response()->json([]);
+        }
+
+        $cities = $governorate->cities()
+            ->active()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
         $cities->push((object)[
             'id' => null,
             'name' => 'غير ذلك',
@@ -134,6 +151,38 @@ class GovernorateController extends Controller
         $city->update($data);
         DashboardFilterListsCache::flushGovernorates();
         return response()->json($city);
+    }
+
+    public function setGovernorateVisibility(Request $request, Governorate $governorate)
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $governorate->update([
+            'is_active' => (bool) $data['is_active'],
+        ]);
+
+        DashboardFilterListsCache::flushGovernorates();
+
+        return response()->json(
+            $governorate->fresh()->load(['cities' => fn ($query) => $query->orderBy('sort_order')->orderBy('name')])
+        );
+    }
+
+    public function setCityVisibility(Request $request, City $city)
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $city->update([
+            'is_active' => (bool) $data['is_active'],
+        ]);
+
+        DashboardFilterListsCache::flushGovernorates();
+
+        return response()->json($city->fresh());
     }
 
     public function deleteCity(City $city)
@@ -199,7 +248,13 @@ class GovernorateController extends Controller
      */
     public function getCitiesMappings()
     {
-        $governorates = Governorate::with('cities')->orderBy('name')->get();
+        $governorates = Governorate::query()
+            ->active()
+            ->with([
+                'cities' => fn ($query) => $query->active()->orderBy('name'),
+            ])
+            ->orderBy('name')
+            ->get();
 
         $byGovernorateId = [];
         $byGovernorateNam = [];

@@ -21,31 +21,41 @@ class DashboardFilterListsController extends Controller
      */
     private array $rankMapsByCategory = [];
 
-    public function governorates(): JsonResponse
+    public function governorates(Request $request): JsonResponse
     {
+        $includeInactive = $request->boolean('include_inactive', false);
+
         $items = DashboardFilterListsCache::remember(
-            DashboardFilterListsCache::governorates(),
-            function () {
-                return Governorate::query()
-                    ->select(['id', 'name', 'sort_order'])
+            DashboardFilterListsCache::governorates($includeInactive),
+            function () use ($includeInactive) {
+                $query = Governorate::query()
+                    ->select(['id', 'name', 'sort_order', 'is_active'])
                     ->with([
-                        'cities' => function ($query) {
-                            $query->select(['id', 'name', 'governorate_id', 'sort_order'])
+                        'cities' => function ($query) use ($includeInactive) {
+                            $query->select(['id', 'name', 'governorate_id', 'sort_order', 'is_active'])
+                                ->when(! $includeInactive, fn ($cityQuery) => $cityQuery->where('is_active', true))
                                 ->orderBy('sort_order')
                                 ->orderBy('name');
                         },
                     ])
                     ->orderBy('sort_order')
-                    ->orderBy('name')
-                    ->get()
+                    ->orderBy('name');
+
+                if (! $includeInactive) {
+                    $query->where('is_active', true);
+                }
+
+                return $query->get()
                     ->map(function (Governorate $governorate) {
                         return [
                             'id' => $governorate->id,
                             'name' => $governorate->name,
+                            'is_active' => (bool) $governorate->is_active,
                             'cities' => $governorate->cities->map(fn ($city) => [
                                 'id' => $city->id,
                                 'name' => $city->name,
                                 'governorate_id' => $city->governorate_id,
+                                'is_active' => (bool) $city->is_active,
                             ])->values()->all(),
                         ];
                     })
@@ -60,6 +70,7 @@ class DashboardFilterListsController extends Controller
     public function sections(Request $request): JsonResponse
     {
         $slug = (string) $request->query('category_slug', '');
+        $includeInactive = $request->boolean('include_inactive', false);
 
         if ($slug === '') {
             return response()->json([
@@ -76,19 +87,19 @@ class DashboardFilterListsController extends Controller
         }
 
         $mainSections = DashboardFilterListsCache::remember(
-            DashboardFilterListsCache::sections($slug),
-            function () use ($category) {
+            DashboardFilterListsCache::sections($slug, $includeInactive),
+            function () use ($category, $includeInactive) {
                 $mainSections = CategoryMainSection::query()
-                    ->select(['id', 'category_id', 'name', 'title', 'sort_order'])
+                    ->select(['id', 'category_id', 'name', 'title', 'sort_order', 'is_active'])
                     ->with([
-                        'subSections' => function ($query) {
-                            $query->select(['id', 'category_id', 'main_section_id', 'name', 'title', 'sort_order'])
-                                ->where('is_active', true)
+                        'subSections' => function ($query) use ($includeInactive) {
+                            $query->select(['id', 'category_id', 'main_section_id', 'name', 'title', 'sort_order', 'is_active'])
+                                ->when(! $includeInactive, fn ($subQuery) => $subQuery->where('is_active', true))
                                 ->orderBy('sort_order');
                         },
                     ])
                     ->where('category_id', $category->id)
-                    ->where('is_active', true)
+                    ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
                     ->orderBy('sort_order')
                     ->get();
 
@@ -100,7 +111,36 @@ class DashboardFilterListsController extends Controller
                     'category_id' => $category->id,
                 ]);
 
-                return $mainSections->all();
+                return $mainSections
+                    ->map(function ($mainSection) {
+                        $subSections = collect($mainSection->subSections ?? $mainSection->sub_sections ?? [])
+                            ->map(function ($subSection) {
+                                return [
+                                    'id' => $subSection->id,
+                                    'category_id' => $subSection->category_id,
+                                    'main_section_id' => $subSection->main_section_id,
+                                    'name' => $subSection->name,
+                                    'title' => $subSection->title ?? $subSection->name,
+                                    'sort_order' => $subSection->sort_order,
+                                    'is_active' => $subSection->id === null ? true : (bool) $subSection->is_active,
+                                ];
+                            })
+                            ->values()
+                            ->all();
+
+                        return [
+                            'id' => $mainSection->id,
+                            'category_id' => $mainSection->category_id,
+                            'name' => $mainSection->name,
+                            'title' => $mainSection->title ?? $mainSection->name,
+                            'sort_order' => $mainSection->sort_order ?? 9999,
+                            'is_active' => $mainSection->id === null ? true : (bool) $mainSection->is_active,
+                            'sub_sections' => $subSections,
+                            'subSections' => $subSections,
+                        ];
+                    })
+                    ->values()
+                    ->all();
             }
         );
 
@@ -116,11 +156,14 @@ class DashboardFilterListsController extends Controller
 
     public function subSections(CategoryMainSection $mainSection): JsonResponse
     {
+        $includeInactive = request()->boolean('include_inactive', false);
+
         $subSections = DashboardFilterListsCache::remember(
-            DashboardFilterListsCache::subSections((int) $mainSection->id),
-            function () use ($mainSection) {
+            DashboardFilterListsCache::subSections((int) $mainSection->id, $includeInactive),
+            function () use ($mainSection, $includeInactive) {
                 $subSections = $mainSection->subSections()
-                    ->select(['id', 'category_id', 'main_section_id', 'name', 'title', 'sort_order'])
+                    ->select(['id', 'category_id', 'main_section_id', 'name', 'title', 'sort_order', 'is_active'])
+                    ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
                     ->orderBy('sort_order')
                     ->get();
 
@@ -131,7 +174,20 @@ class DashboardFilterListsController extends Controller
                     'category_id' => $mainSection->category_id,
                 ]);
 
-                return $subSections->all();
+                return $subSections
+                    ->map(function ($subSection) {
+                        return [
+                            'id' => $subSection->id,
+                            'category_id' => $subSection->category_id,
+                            'main_section_id' => $subSection->main_section_id,
+                            'name' => $subSection->name,
+                            'title' => $subSection->title ?? $subSection->name,
+                            'sort_order' => $subSection->sort_order ?? 9999,
+                            'is_active' => $subSection->id === null ? true : (bool) $subSection->is_active,
+                        ];
+                    })
+                    ->values()
+                    ->all();
             }
         );
 
@@ -140,12 +196,14 @@ class DashboardFilterListsController extends Controller
 
     public function automotive(): JsonResponse
     {
+        $includeInactive = request()->boolean('include_inactive', false);
         $categoryId = Category::query()->where('slug', 'cars')->value('id');
         $payload = DashboardFilterListsCache::remember(
-            DashboardFilterListsCache::automotive(),
+            DashboardFilterListsCache::automotive($includeInactive),
             fn () => $this->buildAutomotivePayload(
                 $categoryId ? (int) $categoryId : null,
-                null
+                null,
+                $includeInactive
             )
         );
 
@@ -155,6 +213,7 @@ class DashboardFilterListsController extends Controller
     public function fieldCategory(Request $request): JsonResponse
     {
         $slug = (string) $request->query('category_slug', '');
+        $includeHidden = $request->boolean('include_hidden', false);
 
         if ($slug === '') {
             return response()->json([
@@ -191,13 +250,17 @@ class DashboardFilterListsController extends Controller
             ->orderBy('category_slug')
             ->orderBy('sort_order')
             ->get()
-            ->map(function (CategoryField $field) use ($category) {
+            ->map(function (CategoryField $field) use ($category, $includeHidden) {
                 if (! empty($field->options) && is_array($field->options)) {
-                    $field->options = $this->sortOptionsByRank(
+                    $sortedOptions = $this->sortOptionsByRank(
                         (int) $category->id,
                         (string) $field->field_name,
                         $field->options
                     );
+
+                    $field->options = $includeHidden
+                        ? $sortedOptions
+                        : $this->filterHiddenOptions($field, $sortedOptions);
                 }
 
                 return $field;
@@ -209,12 +272,16 @@ class DashboardFilterListsController extends Controller
         $supportsSections = $this->supportsSections($slug);
 
         $payload = DashboardFilterListsCache::remember(
-            DashboardFilterListsCache::fieldCategory($slug),
-            function () use ($automotiveFallbackCategoryId, $category, $fields, $supportsMakeModel, $supportsSections) {
+            DashboardFilterListsCache::fieldCategory($slug, $includeHidden),
+            function () use ($automotiveFallbackCategoryId, $category, $fields, $supportsMakeModel, $supportsSections, $includeHidden) {
                 return [
                     'data' => $fields->all(),
                     'makes' => $supportsMakeModel
-                        ? $this->buildAutomotivePayload((int) $category->id, $automotiveFallbackCategoryId ? (int) $automotiveFallbackCategoryId : null)
+                        ? $this->buildAutomotivePayload(
+                            (int) $category->id,
+                            $automotiveFallbackCategoryId ? (int) $automotiveFallbackCategoryId : null,
+                            $includeHidden
+                        )
                         : [],
                     'supports_make_model' => $supportsMakeModel,
                     'supports_sections' => $supportsSections,
@@ -400,15 +467,17 @@ class DashboardFilterListsController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildAutomotivePayload(?int $primaryCategoryId, ?int $fallbackCategoryId): array
+    private function buildAutomotivePayload(?int $primaryCategoryId, ?int $fallbackCategoryId, bool $includeInactive = false): array
     {
         $items = Make::query()
-            ->select(['id', 'name'])
+            ->select(['id', 'name', 'is_active'])
             ->with([
-                'models' => function ($query) {
-                    $query->select(['id', 'name', 'make_id']);
+                'models' => function ($query) use ($includeInactive) {
+                    $query->select(['id', 'name', 'make_id', 'is_active'])
+                        ->when(! $includeInactive, fn ($modelQuery) => $modelQuery->where('is_active', true));
                 },
             ])
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
             ->get();
 
         $makes = [];
@@ -445,6 +514,7 @@ class DashboardFilterListsController extends Controller
             $makes[] = [
                 'id' => $make->id,
                 'name' => $make->name,
+                'is_active' => (bool) $make->is_active,
                 'models' => collect($modelNames)->values()->map(function ($modelName, $index) use ($modelsByName, $make) {
                     $model = $modelsByName->get($modelName);
 
@@ -453,6 +523,7 @@ class DashboardFilterListsController extends Controller
                         'name' => $modelName,
                         'make_id' => $make->id,
                         'rank' => $index + 1,
+                        'is_active' => $model ? (bool) $model->is_active : true,
                     ];
                 })->all(),
             ];
@@ -496,6 +567,56 @@ class DashboardFilterListsController extends Controller
         ];
 
         return $payload;
+    }
+
+    /**
+     * @param array<int, string> $options
+     * @return array<int, string>
+     */
+    private function filterHiddenOptions(CategoryField $field, array $options): array
+    {
+        $hiddenOptions = $this->getHiddenOptions($field);
+
+        if ($hiddenOptions === []) {
+            return $options;
+        }
+
+        $hiddenMap = array_fill_keys($hiddenOptions, true);
+
+        return array_values(array_filter($options, function ($option) use ($hiddenMap) {
+            if ($option === OptionsHelper::OTHER_OPTION) {
+                return true;
+            }
+
+            return ! isset($hiddenMap[$option]);
+        }));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function getHiddenOptions(CategoryField $field): array
+    {
+        $rules = is_array($field->rules_json) ? $field->rules_json : [];
+        $hiddenOptions = $rules['hidden_options'] ?? [];
+
+        if (! is_array($hiddenOptions)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($hiddenOptions as $option) {
+            $value = trim((string) $option);
+
+            if ($value === '' || $value === OptionsHelper::OTHER_OPTION) {
+                continue;
+            }
+
+            $normalized[] = $value;
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     private function sortOptionsByRankWithCategoryFallback(

@@ -26,8 +26,16 @@ class MakeController extends Controller
 
     public function index()
     {
+        $includeInactive = request()->boolean('include_inactive', false);
         $categoryId = Category::where('slug', 'cars')->value('id');
-        $items = Make::with('models')->get();
+        $items = Make::query()
+            ->with([
+                'models' => function ($query) use ($includeInactive) {
+                    $query->when(! $includeInactive, fn ($modelQuery) => $modelQuery->where('is_active', true));
+                },
+            ])
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
+            ->get();
         
         // معالجة الماركات والموديلات (الترتيب سيتم في الفرونت إند)
         $makesArray = [];
@@ -56,6 +64,7 @@ class MakeController extends Controller
             $makesArray[] = [
                 'id' => $make->id,
                 'name' => $make->name,
+                'is_active' => (bool) $make->is_active,
                 'models' => collect($modelNames)->values()->map(function($modelName, $idx) use ($make, $modelsByName) {
                     $model = $modelsByName->get($modelName);
                     return (object)[
@@ -63,6 +72,7 @@ class MakeController extends Controller
                         'name' => $modelName,
                         'make_id' => $make->id,
                         'rank' => $idx + 1,
+                        'is_active' => $model ? (bool) $model->is_active : true,
                     ];
                 })->all()
             ];
@@ -232,7 +242,10 @@ class MakeController extends Controller
 
     public function models(Make $make)
     {
-        $models = $make->models()->get();
+        $includeInactive = request()->boolean('include_inactive', false);
+        $models = $make->models()
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
+            ->get();
         
         // معالجة الموديلات (الترتيب سيتم في الفرونت إند)
         $modelNames = $models->pluck('name')->toArray();
@@ -262,7 +275,8 @@ class MakeController extends Controller
             return (object)[
                 'id' => $model ? $model->id : null,
                 'name' => $name,
-                'make_id' => $make->id
+                'make_id' => $make->id,
+                'is_active' => $model ? (bool) $model->is_active : true,
             ];
         });
         
@@ -415,6 +429,36 @@ class MakeController extends Controller
         $model->update($data);
         DashboardFilterListsCache::flushAutomotive();
         return response()->json($model);
+    }
+
+    public function setVisibility(Request $request, Make $make)
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $make->update(['is_active' => $data['is_active']]);
+
+        if (! $data['is_active']) {
+            $make->models()->update(['is_active' => false]);
+        }
+
+        DashboardFilterListsCache::flushAutomotive();
+
+        return response()->json($make->fresh()->load('models'));
+    }
+
+    public function setModelVisibility(Request $request, CarModel $model)
+    {
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $model->update(['is_active' => $data['is_active']]);
+
+        DashboardFilterListsCache::flushAutomotive();
+
+        return response()->json($model->fresh());
     }
 
     public function deleteModel(CarModel $model)

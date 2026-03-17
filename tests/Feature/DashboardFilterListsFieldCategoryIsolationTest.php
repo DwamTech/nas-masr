@@ -97,6 +97,35 @@ class DashboardFilterListsFieldCategoryIsolationTest extends TestCase
         );
     }
 
+    public function test_hidden_field_options_are_excluded_from_public_reads_but_available_for_management(): void
+    {
+        $this->seedFieldCategoryData();
+
+        DB::table('category_fields')
+            ->where('category_slug', 'spare-parts')
+            ->where('field_name', 'condition')
+            ->update([
+                'rules_json' => json_encode([
+                    'hidden_options' => ['جديد'],
+                ], JSON_UNESCAPED_UNICODE),
+            ]);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $this->getJson('/api/category-fields?category_slug=spare-parts')
+            ->assertOk()
+            ->assertJsonPath('data.0.options.0', 'مستعمل')
+            ->assertJsonPath('data.0.options.1', 'غير ذلك');
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/filter-lists/field-category?category_slug=spare-parts&include_hidden=1')
+            ->assertOk()
+            ->assertJsonPath('data.0.options.0', 'مستعمل')
+            ->assertJsonPath('data.0.options.1', 'جديد');
+    }
+
     protected function seedFieldCategoryData(): array
     {
         DB::table('categories')->insert([

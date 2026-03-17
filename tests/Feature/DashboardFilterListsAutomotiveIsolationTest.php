@@ -82,8 +82,32 @@ class DashboardFilterListsAutomotiveIsolationTest extends TestCase
             ->assertJsonFragment([
                 'name' => 'Toyota',
             ])
+            ->assertJsonMissing([
+                'name' => 'Hyundai',
+            ])
             ->assertJsonFragment([
                 'name' => 'غير ذلك',
+            ]);
+    }
+
+    public function test_dashboard_automotive_route_can_include_inactive_items_for_management_only(): void
+    {
+        $this->seedAutomotiveContext();
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/filter-lists/automotive?include_inactive=1')
+            ->assertOk()
+            ->assertJsonFragment([
+                'name' => 'Hyundai',
+                'is_active' => false,
+            ])
+            ->assertJsonFragment([
+                'name' => 'Accent',
+                'is_active' => false,
             ]);
     }
 
@@ -107,6 +131,22 @@ class DashboardFilterListsAutomotiveIsolationTest extends TestCase
         $modelId = DB::table('models')->insertGetId([
             'make_id' => $makeId,
             'name' => 'Corolla',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $hiddenMakeId = DB::table('makes')->insertGetId([
+            'name' => 'Hyundai',
+            'is_active' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('models')->insert([
+            'make_id' => $hiddenMakeId,
+            'name' => 'Accent',
+            'is_active' => false,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

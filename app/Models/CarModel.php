@@ -11,7 +11,11 @@ class CarModel extends Model
     //
     use HasFactory;
 protected $table='models';
-    protected $fillable = ['name', 'make_id'];
+    protected $fillable = ['name', 'make_id', 'is_active'];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 
     public function make()
     {

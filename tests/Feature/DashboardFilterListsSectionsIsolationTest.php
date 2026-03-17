@@ -85,6 +85,61 @@ class DashboardFilterListsSectionsIsolationTest extends TestCase
             ]);
     }
 
+    public function test_dashboard_sections_route_can_include_inactive_items_for_management(): void
+    {
+        $ctx = $this->seedSections();
+
+        DB::table('category_main_sections')->insert([
+            'category_id' => 1,
+            'name' => 'طيور',
+            'title' => 'طيور',
+            'sort_order' => 2,
+            'is_active' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('category_sub_section')->insert([
+            'category_id' => 1,
+            'main_section_id' => $ctx['main_section_id'],
+            'name' => 'كلاب',
+            'title' => 'كلاب',
+            'sort_order' => 2,
+            'is_active' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        $this->getJson('/api/main-sections?category_slug=animals')
+            ->assertOk()
+            ->assertJsonMissing([
+                'name' => 'طيور',
+            ])
+            ->assertJsonMissing([
+                'name' => 'كلاب',
+            ]);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/filter-lists/sections?category_slug=animals&include_inactive=1')
+            ->assertOk()
+            ->assertJsonFragment([
+                'name' => 'طيور',
+                'is_active' => false,
+            ]);
+
+        $this->actingAs($admin)
+            ->getJson("/api/admin/filter-lists/sections/{$ctx['main_section_id']}/sub-sections?include_inactive=1")
+            ->assertOk()
+            ->assertJsonFragment([
+                'name' => 'كلاب',
+                'is_active' => false,
+            ]);
+    }
+
     protected function seedSections(): array
     {
         DB::table('categories')->insert([

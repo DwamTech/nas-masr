@@ -42,17 +42,21 @@ class CategoryFieldsController extends Controller
         }
 
         $fields = $q->get();
+        $includeHidden = $request->boolean('include_hidden', false);
 
         // Sort options by rank if ranks exist
         $category = $slug ? Category::where('slug', $slug)->first() : null;
         if ($category) {
-            $fields = $fields->map(function ($field) use ($category) {
+            $fields = $fields->map(function ($field) use ($category, $includeHidden) {
                 if (!empty($field->options) && is_array($field->options)) {
-                    $field->options = $this->sortOptionsByRank(
+                    $sortedOptions = $this->sortOptionsByRank(
                         $category->id,
                         $field->field_name,
                         $field->options
                     );
+                    $field->options = $includeHidden
+                        ? $sortedOptions
+                        : $this->filterHiddenOptions($field, $sortedOptions);
                 }
                 return $field;
             });
@@ -63,8 +67,9 @@ class CategoryFieldsController extends Controller
 
         // جلب المحافظات والمدن بنفس ترتيب الداشبورد (sort_order ثم الاسم)
         // ملاحظة: لا نستخدم category_field_option_ranks هنا حتى يكون التطبيق مطابقًا تمامًا للداشبورد.
-        $governorates = Governorate::with([
+        $governorates = Governorate::active()->with([
             'cities' => function ($q) {
+                $q->where('is_active', true);
                 $q->orderBy('sort_order')->orderBy('name');
             }
         ])->orderBy('sort_order')->orderBy('name')->get();
@@ -330,6 +335,12 @@ class CategoryFieldsController extends Controller
             $this->updateRanksForOptions($categorySlug, $data['field_name'], $data['options']);
         }
 
+        if (array_key_exists('rules_json', $data)) {
+            $data['rules_json'] = $this->normalizeRulesJson($data['rules_json'], $data['options'] ?? $field->options ?? []);
+        } else {
+            $data['rules_json'] = $this->normalizeRulesJson($field->rules_json ?? [], $data['options'] ?? $field->options ?? []);
+        }
+
         unset($data['field_name']);
 
         $field->update($data);
@@ -371,6 +382,84 @@ class CategoryFieldsController extends Controller
         }
 
         return $this->sortOptionsByExplicitRankMap($options, $rankMap);
+    }
+
+    /**
+     * @param array<int, string> $options
+     * @return array<int, string>
+     */
+    private function filterHiddenOptions(CategoryField $field, array $options): array
+    {
+        $hiddenOptions = $this->getHiddenOptions($field->rules_json ?? []);
+
+        if ($hiddenOptions === []) {
+            return $options;
+        }
+
+        $hiddenMap = array_fill_keys($hiddenOptions, true);
+
+        return array_values(array_filter($options, function ($option) use ($hiddenMap) {
+            if ($option === OptionsHelper::OTHER_OPTION) {
+                return true;
+            }
+
+            return ! isset($hiddenMap[$option]);
+        }));
+    }
+
+    /**
+     * @param mixed $rulesJson
+     * @return array<int, string>
+     */
+    private function getHiddenOptions(mixed $rulesJson): array
+    {
+        $rules = is_array($rulesJson) ? $rulesJson : [];
+        $hiddenOptions = $rules['hidden_options'] ?? [];
+
+        if (! is_array($hiddenOptions)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($hiddenOptions as $option) {
+            $value = trim((string) $option);
+
+            if ($value === '' || $value === OptionsHelper::OTHER_OPTION) {
+                continue;
+            }
+
+            $normalized[] = $value;
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param mixed $rulesJson
+     * @param array<int, string> $options
+     * @return array<string, mixed>
+     */
+    private function normalizeRulesJson(mixed $rulesJson, array $options): array
+    {
+        $rules = is_array($rulesJson) ? $rulesJson : [];
+        $availableOptions = array_fill_keys($options, true);
+        $hiddenOptions = [];
+
+        foreach ($this->getHiddenOptions($rules) as $option) {
+            if (isset($availableOptions[$option])) {
+                $hiddenOptions[] = $option;
+            }
+        }
+
+        if ($hiddenOptions === []) {
+            unset($rules['hidden_options']);
+            return $rules;
+        }
+
+        $rules['hidden_options'] = array_values(array_unique($hiddenOptions));
+
+        return $rules;
     }
 
     /**

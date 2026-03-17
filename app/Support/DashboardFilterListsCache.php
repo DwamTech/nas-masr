@@ -12,29 +12,29 @@ final class DashboardFilterListsCache
     private const TTL_SECONDS = 300;
     private const AUTOMOTIVE_FIELD_CATEGORIES = ['cars', 'cars_rent', 'spare-parts'];
 
-    public static function governorates(): string
+    public static function governorates(bool $includeInactive = false): string
     {
-        return self::PREFIX . 'governorates';
+        return self::PREFIX . 'governorates' . ($includeInactive ? ':with-inactive' : '');
     }
 
-    public static function sections(string $categorySlug): string
+    public static function sections(string $categorySlug, bool $includeInactive = false): string
     {
-        return self::PREFIX . 'sections:' . $categorySlug;
+        return self::PREFIX . 'sections:' . $categorySlug . ($includeInactive ? ':with-inactive' : '');
     }
 
-    public static function subSections(int $mainSectionId): string
+    public static function subSections(int $mainSectionId, bool $includeInactive = false): string
     {
-        return self::PREFIX . 'sub-sections:' . $mainSectionId;
+        return self::PREFIX . 'sub-sections:' . $mainSectionId . ($includeInactive ? ':with-inactive' : '');
     }
 
-    public static function automotive(): string
+    public static function automotive(bool $includeInactive = false): string
     {
-        return self::PREFIX . 'automotive';
+        return self::PREFIX . 'automotive' . ($includeInactive ? ':with-inactive' : '');
     }
 
-    public static function fieldCategory(string $categorySlug): string
+    public static function fieldCategory(string $categorySlug, bool $includeHidden = false): string
     {
-        return self::PREFIX . 'field-category:' . $categorySlug;
+        return self::PREFIX . 'field-category:' . $categorySlug . ($includeHidden ? ':with-hidden' : '');
     }
 
     public static function remember(string $key, Closure $callback, ?int $ttlSeconds = null): mixed
@@ -71,15 +71,19 @@ final class DashboardFilterListsCache
 
     public static function flushGovernorates(): void
     {
-        self::forget(self::governorates());
+        self::forget(
+            self::governorates(),
+            self::governorates(true)
+        );
     }
 
     public static function flushAutomotive(): void
     {
-        $keys = [self::automotive()];
+        $keys = [self::automotive(), self::automotive(true)];
 
         foreach (self::AUTOMOTIVE_FIELD_CATEGORIES as $slug) {
             $keys[] = self::fieldCategory($slug);
+            $keys[] = self::fieldCategory($slug, true);
         }
 
         self::forget(...$keys);
@@ -87,15 +91,24 @@ final class DashboardFilterListsCache
 
     public static function flushFieldCategory(string $categorySlug): void
     {
-        self::forget(self::fieldCategory($categorySlug));
+        self::forget(
+            self::fieldCategory($categorySlug),
+            self::fieldCategory($categorySlug, true)
+        );
     }
 
     public static function flushSections(string $categorySlug, ?int $mainSectionId = null): void
     {
-        $keys = [self::sections($categorySlug), self::fieldCategory($categorySlug)];
+        $keys = [
+            self::sections($categorySlug),
+            self::sections($categorySlug, true),
+            self::fieldCategory($categorySlug),
+            self::fieldCategory($categorySlug, true),
+        ];
 
         if ($mainSectionId !== null) {
             $keys[] = self::subSections($mainSectionId);
+            $keys[] = self::subSections($mainSectionId, true);
         }
 
         self::forget(...$keys);
