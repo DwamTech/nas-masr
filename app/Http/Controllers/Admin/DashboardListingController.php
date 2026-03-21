@@ -12,7 +12,6 @@ use App\Services\AdminNotificationService;
 use App\Services\ListingService;
 use App\Support\Section;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Cache;
 
 class DashboardListingController extends ListingController
 {
@@ -93,9 +92,7 @@ class DashboardListingController extends ListingController
             return now()->addDays($days > 0 ? $days : 30);
         }
 
-        $freeDays = Cache::remember('settings:free_ad_days_validity', now()->addHours(6), function () {
-            return (int) (SystemSetting::where('key', 'free_ad_days_validity')->value('value') ?? 365);
-        });
+        $freeDays = SystemSetting::cachedPositiveInt('free_ad_days_validity', 365);
 
         return now()->addDays($freeDays > 0 ? $freeDays : 365);
     }

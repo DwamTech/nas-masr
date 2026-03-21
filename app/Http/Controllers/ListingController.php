@@ -435,9 +435,7 @@ class ListingController extends Controller
                 $data['admin_approved'] = true;
                 $data['published_at'] = now();
                 if (($data['plan_type'] ?? 'free') === 'free' && empty($data['expire_at'])) {
-                    $freeDays = Cache::remember('settings:free_ad_days_validity', now()->addHours(6), function () {
-                        return (int)(SystemSetting::where('key', 'free_ad_days_validity')->value('value') ?? 365);
-                    });
+                    $freeDays = SystemSetting::cachedPositiveInt('free_ad_days_validity', 365);
                     $data['expire_at'] = now()->addDays($freeDays);
                 }
                 if (($data['plan_type'] ?? 'free') === 'free') {
@@ -609,9 +607,7 @@ class ListingController extends Controller
                 ], 402);
             }
 
-            $freeDays = Cache::remember('settings:free_ad_days_validity', now()->addHours(6), function () {
-                return (int)(SystemSetting::where('key', 'free_ad_days_validity')->value('value') ?? 365);
-            });
+            $freeDays = SystemSetting::cachedPositiveInt('free_ad_days_validity', 365);
 
             $listing->update([
                 'expire_at' => now()->addDays($freeDays),
