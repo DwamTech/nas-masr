@@ -14,6 +14,7 @@ class Notification extends Model
         'title',
         'body',
         'type',
+        'source_type',
         'data',
         'read_at',
     ];
@@ -28,4 +29,3 @@ class Notification extends Model
         return $this->belongsTo(User::class);
     }
 }
-

@@ -638,6 +638,7 @@ class ListingController extends Controller
                 $notifications,
                 (int) $listing->user_id,
                 (int) $viewer->id,
+                (string) ($viewer->name ?? ''),
                 (int) $listing->id,
                 (string) $sec->name,
                 (string) $sec->slug
@@ -682,11 +683,12 @@ class ListingController extends Controller
         NotificationService $notifications,
         int $ownerId,
         int $viewerId,
+        string $viewerName,
         int $listingId,
         string $sectionName,
         string $sectionSlug
     ): void {
-        app()->terminating(function () use ($notifications, $ownerId, $viewerId, $listingId, $sectionName, $sectionSlug) {
+        app()->terminating(function () use ($notifications, $ownerId, $viewerId, $viewerName, $listingId, $sectionName, $sectionSlug) {
             try {
                 $notifications->dispatch(
                     $ownerId,
@@ -695,9 +697,12 @@ class ListingController extends Controller
                     'view',
                     [
                         'viewer_id' => $viewerId,
+                        'viewer_name' => $viewerName,
                         'listing_id' => $listingId,
                         'category_slug' => $sectionSlug,
-                    ]
+                    ],
+                    false,
+                    NotificationService::SOURCE_CLIENT
                 );
             } catch (\Throwable $e) {
                 Log::warning('view_notification_after_response_failed', [

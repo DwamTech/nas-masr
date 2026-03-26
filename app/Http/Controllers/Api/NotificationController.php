@@ -58,6 +58,7 @@ class NotificationController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string'],
             'type' => ['nullable', 'string', 'max:50'],
+            'source_type' => ['nullable', 'string', 'max:50'],
             'data' => ['nullable', 'array'],
         ]);
 
@@ -67,7 +68,8 @@ class NotificationController extends Controller
             $data['body'],
             $data['type'] ?? null,
             $data['data'] ?? null,
-            true // Bypass cooldown for admin
+            true, // Bypass cooldown for admin
+            $data['source_type'] ?? null
         );
 
         return response()->json([

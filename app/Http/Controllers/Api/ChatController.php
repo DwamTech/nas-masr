@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Chat\SendMessageRequest;
+use App\Models\Listing;
 use App\Models\User;
 use App\Models\UserConversation;
 use App\Services\ChatService;
@@ -112,16 +113,39 @@ class ChatController extends Controller
         $cacheKey = "chat_notif_cooldown:{$sender->id}:{$receiver->id}";
         if (!Cache::has($cacheKey)) {
             $msgPreview = $conversation->content_type === 'text' ? "لديك رسالة جديدة من {$sender->name}" : "أرسل لك {$sender->name} مرفقاً";
+            $sourceType = $this->resolvePeerNotificationSourceType($sender, $conversation->listing_id);
             
             $this->notificationService->dispatch(
                 $receiver->id,
                 'رسالة جديدة',
                 $msgPreview,
                 'new_message',
-                ['conversation_id' => $conversation->conversation_id, 'sender_id' => $sender->id]
+                [
+                    'conversation_id' => $conversation->conversation_id,
+                    'sender_id' => $sender->id,
+                    'sender_name' => $sender->name,
+                    'listing_id' => $conversation->listing_id,
+                ],
+                false,
+                $sourceType
             );
             Cache::put($cacheKey, true, now()->addMinutes(10));
         }
+    }
+
+    private function resolvePeerNotificationSourceType(User $sender, ?int $listingId): string
+    {
+        if ($listingId) {
+            $listingOwnerId = Listing::query()
+                ->whereKey($listingId)
+                ->value('user_id');
+
+            if ((int) $listingOwnerId === (int) $sender->id) {
+                return NotificationService::SOURCE_ADVERTISER;
+            }
+        }
+
+        return NotificationService::SOURCE_CLIENT;
     }
 
     /**

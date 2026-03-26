@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
+    public const SOURCE_ADMIN = 'admin';
+    public const SOURCE_ADVERTISER = 'advertiser';
+    public const SOURCE_CLIENT = 'client';
+
     /**
      * Cooldown period in seconds for duplicate notifications
      */
@@ -22,12 +26,21 @@ class NotificationService
         $this->firebase = $firebase;
     }
 
-    public function dispatch(int $userId, string $title, string $body, ?string $type = null, ?array $data = null, bool $bypassCooldown = false): array
+    public function dispatch(
+        int $userId,
+        string $title,
+        string $body,
+        ?string $type = null,
+        ?array $data = null,
+        bool $bypassCooldown = false,
+        ?string $sourceType = null
+    ): array
     {
         $user = User::findOrFail($userId);
+        $resolvedSourceType = $this->resolveSourceType($type, $bypassCooldown, $sourceType);
 
         // ✅ إشعارات الأدمن: لا قيود، لا cooldown، لا شيء - تنفيذ فوري
-        if ($type === 'الاداره' || $bypassCooldown) {
+        if ($type === 'الاداره' || $bypassCooldown || $resolvedSourceType === self::SOURCE_ADMIN) {
             Log::info('🔵 Admin notification bypass activated', [
                 'user_id' => $userId,
                 'title' => $title,
@@ -40,6 +53,7 @@ class NotificationService
                 'title' => $title,
                 'body' => $body,
                 'type' => $type,
+                'source_type' => $resolvedSourceType,
                 'data' => $data,
             ]);
 
@@ -64,6 +78,7 @@ class NotificationService
                     'title' => $title,
                     'body' => $body,
                     'type' => $type,
+                    'source_type' => $resolvedSourceType,
                     'data' => $data,
                 ]);
                 
@@ -108,6 +123,7 @@ class NotificationService
             'title' => $title,
             'body' => $body,
             'type' => $type,
+            'source_type' => $resolvedSourceType,
             'data' => $data,
         ]);
 
@@ -128,6 +144,7 @@ class NotificationService
                 'title' => $title,
                 'body' => $body,
                 'type' => $type,
+                'source_type' => $resolvedSourceType,
                 'data' => $data,
             ]);
         }
@@ -137,6 +154,19 @@ class NotificationService
             'external_sent' => $externalSent,
             'skipped' => false,
         ];
+    }
+
+    private function resolveSourceType(?string $type, bool $bypassCooldown, ?string $sourceType): ?string
+    {
+        if (!empty($sourceType)) {
+            return $sourceType;
+        }
+
+        if ($type === 'الاداره' || $bypassCooldown) {
+            return self::SOURCE_ADMIN;
+        }
+
+        return null;
     }
 
     protected function sendExternal(User $user, array $payload): bool
