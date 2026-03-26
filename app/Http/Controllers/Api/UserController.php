@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\UserClient;
 use App\Models\UserPackages;
 use App\Models\UserPlanSubscription;
+use App\Models\UserSavedLocation;
 use App\Support\Section;
 use App\Traits\HasRank;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +34,6 @@ class UserController extends Controller
     public function getUserProfile()
     {
         $user = Auth::user();
-        $code = UserClient::where('user_id', $user->id)->first();
 
         if (!$user) {
             return response([
@@ -41,9 +41,12 @@ class UserController extends Controller
             ], 401);
         }
 
+        $user->load('savedLocations');
+        $code = UserClient::where('user_id', $user->id)->first();
+
         return response([
             'message' => 'Profile fetched successfully',
-            'data' => $user,
+            'data' => $this->profilePayload($user),
             'code' => $code->user_id ?? null
         ], 200);
     }
@@ -100,11 +103,107 @@ class UserController extends Controller
         }
 
         $user->update($validated);
+        $freshUser = $user->fresh()->load('savedLocations');
 
         return response([
             'message' => 'Profile updated successfully',
-            'data' => $user->fresh(),
+            'data' => $this->profilePayload($freshUser),
 
+        ], 200);
+    }
+
+    public function savedLocations(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response([
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+
+        return response([
+            'message' => 'Saved locations fetched successfully',
+            'data' => $this->savedLocationPayloads($user),
+        ], 200);
+    }
+
+    public function storeSavedLocation(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response([
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:120'],
+            'address' => ['required', 'string', 'max:255'],
+            'lat' => ['required', 'numeric'],
+            'lng' => ['required', 'numeric'],
+        ]);
+
+        $location = $user->savedLocations()->create($validated);
+
+        return response([
+            'message' => 'Saved location created successfully',
+            'data' => $this->savedLocationPayload($location),
+        ], 201);
+    }
+
+    public function updateSavedLocation(Request $request, UserSavedLocation $savedLocation)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response([
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+
+        if ((int) $savedLocation->user_id !== (int) $user->id) {
+            return response([
+                'message' => 'غير مصرح لك بتعديل هذا الموقع'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:120'],
+            'address' => ['required', 'string', 'max:255'],
+            'lat' => ['required', 'numeric'],
+            'lng' => ['required', 'numeric'],
+        ]);
+
+        $savedLocation->update($validated);
+
+        return response([
+            'message' => 'Saved location updated successfully',
+            'data' => $this->savedLocationPayload($savedLocation->fresh()),
+        ], 200);
+    }
+
+    public function deleteSavedLocation(Request $request, UserSavedLocation $savedLocation)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response([
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+
+        if ((int) $savedLocation->user_id !== (int) $user->id) {
+            return response([
+                'message' => 'غير مصرح لك بحذف هذا الموقع'
+            ], 403);
+        }
+
+        $savedLocation->delete();
+
+        return response([
+            'message' => 'Saved location deleted successfully',
         ], 200);
     }
 
@@ -795,6 +894,39 @@ class UserController extends Controller
             'role' => $user->role ?? 'user',
             'allowed_dashboard_pages' => $user->dashboardPageKeys(),
             'profile_image_url' => $user->profile_image_url,
+        ];
+    }
+
+    private function profilePayload(User $user): array
+    {
+        $data = $user->toArray();
+        $data['saved_locations'] = $this->savedLocationPayloads($user);
+
+        return $data;
+    }
+
+    private function savedLocationPayloads(User $user): array
+    {
+        $locations = $user->relationLoaded('savedLocations')
+            ? $user->savedLocations
+            : $user->savedLocations()->latest('id')->get();
+
+        return $locations
+            ->map(fn (UserSavedLocation $location) => $this->savedLocationPayload($location))
+            ->values()
+            ->all();
+    }
+
+    private function savedLocationPayload(UserSavedLocation $location): array
+    {
+        return [
+            'id' => $location->id,
+            'title' => $location->title,
+            'address' => $location->address,
+            'lat' => $location->lat,
+            'lng' => $location->lng,
+            'created_at' => $location->created_at?->toISOString(),
+            'updated_at' => $location->updated_at?->toISOString(),
         ];
     }
 

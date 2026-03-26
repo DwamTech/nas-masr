@@ -85,6 +85,11 @@ class User extends Authenticatable
         return $this->hasMany(Listing::class);
     }
 
+    public function savedLocations(): HasMany
+    {
+        return $this->hasMany(UserSavedLocation::class)->latest('id');
+    }
+
     public function reports(): HasMany
     {
         return $this->hasMany(ListingReport::class);

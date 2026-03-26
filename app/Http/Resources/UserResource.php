@@ -14,6 +14,10 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $savedLocations = $this->relationLoaded('savedLocations')
+            ? $this->savedLocations
+            : $this->savedLocations()->latest('id')->get();
+
         return [
             'id' => $this->id,
             // 'UserName' => $this->name,
@@ -23,7 +27,17 @@ class UserResource extends JsonResource
             'referral_code' => $this->referral_code??null,
             'country_code' => $this->country_code??null,
             'created_at' => $this->created_at?->format('Y-m-d H:i'),
-
+            'saved_locations' => $savedLocations->map(function ($location) {
+                return [
+                    'id' => $location->id,
+                    'title' => $location->title,
+                    'address' => $location->address,
+                    'lat' => $location->lat,
+                    'lng' => $location->lng,
+                    'created_at' => $location->created_at?->toISOString(),
+                    'updated_at' => $location->updated_at?->toISOString(),
+                ];
+            })->values(),
         ];
     }
 }

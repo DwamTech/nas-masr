@@ -344,6 +344,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/verify-otp', [UserController::class, 'verifyOtp']);
     Route::get('/get-profile', [UserController::class, 'getUserProfile']);
     Route::put('/edit-profile', [UserController::class, 'editProfile']);
+    Route::get('/saved-locations', [UserController::class, 'savedLocations']);
+    Route::post('/saved-locations', [UserController::class, 'storeSavedLocation']);
+    Route::put('/saved-locations/{savedLocation}', [UserController::class, 'updateSavedLocation']);
+    Route::delete('/saved-locations/{savedLocation}', [UserController::class, 'deleteSavedLocation']);
     Route::get('/my-ads', [UserController::class, 'myAds']);
     Route::get('/my-packages', [UserController::class, 'myPackages']);
     Route::get('/my-plans', [UserController::class, 'myPlans']);
