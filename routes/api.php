@@ -337,8 +337,8 @@ Route::middleware('auth:sanctum')->post('/add-car', [CarController::class, 'stor
 // Route::get('/values/{categorySlug?}', [CategoryFieldsController::class, 'index']);
 
 
-Route::post('/fcm-token', [UserController::class, 'updateFcmToken']);
-Route::get('/fcm-token', [UserController::class, 'getGuestUser']);
+Route::post('/guest/fcm-token', [UserController::class, 'updateFcmToken']);
+Route::get('/guest/fcm-token', [UserController::class, 'getGuestUser']);
 //Route::delete('/fcm-token', [UserController::class, 'deleteFcmToken']);
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -364,8 +364,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/favorite', [FavoriteController::class, 'toggle']);
 
     // FCM Token Management (authenticated users)
-    Route::post('/user/fcm-token', [UserController::class, 'updateUserFcmToken']);
-    Route::delete('/user/fcm-token', [UserController::class, 'deleteUserFcmToken']);
+    Route::post('/fcm-token', [UserController::class, 'updateUserFcmToken']);
+    Route::delete('/fcm-token', [UserController::class, 'deleteUserFcmToken']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/status', [NotificationController::class, 'status']);
