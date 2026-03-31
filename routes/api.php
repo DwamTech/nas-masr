@@ -329,6 +329,15 @@ Route::prefix('admin')
             Route::match(['post', 'put'], '/system-settings/upload-image', [SystemSettingController::class, 'uploadDefaultImage']);
             Route::post('/system-settings', [SystemSettingController::class, 'store']);
         });
+
+        // Backup Routes
+        Route::prefix('backups')->middleware('admin')->group(function () {
+            Route::get('/diagnostics', [\App\Http\Controllers\Admin\BackupController::class, 'diagnostics']);
+            Route::get('/', [\App\Http\Controllers\Admin\BackupController::class, 'index']);
+            Route::post('/', [\App\Http\Controllers\Admin\BackupController::class, 'store']);
+            Route::post('/{id}/restore', [\App\Http\Controllers\Admin\BackupController::class, 'restore']);
+            Route::delete('/{id}', [\App\Http\Controllers\Admin\BackupController::class, 'destroy']);
+        });
     });
 
 Route::get('/all-cars', [CarController::class, 'index']);
