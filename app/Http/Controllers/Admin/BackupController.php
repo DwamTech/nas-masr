@@ -115,4 +115,61 @@ class BackupController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * GET /api/admin/backups/{id}/download
+     */
+    public function download(int $id): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        try {
+            $backup = $this->backupService->getBackup($id);
+            $path = $this->backupService->getBackupPath($backup);
+
+            return response()->download($path, $backup->file_name);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            abort(404, 'النسخة الاحتياطية غير موجودة.');
+
+        } catch (RuntimeException $e) {
+            abort(500, 'فشل تحميل النسخة الاحتياطية: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * POST /api/admin/backups/upload
+     */
+    public function upload(\App\Http\Requests\Admin\UploadBackupRequest $request): JsonResponse
+    {
+        try {
+            $backup = $this->backupService->uploadBackup($request->file('file'));
+
+            return response()->json([
+                'message' => 'تم رفع النسخة الاحتياطية بنجاح.',
+                'data'    => [
+                    'id'             => $backup->id,
+                    'file_name'      => $backup->file_name,
+                    'type'           => $backup->type,
+                    'size'           => $backup->size,
+                    'size_formatted' => $backup->formattedSize(),
+                    'created_at'     => $backup->created_at->toIso8601String(),
+                ],
+            ], 201);
+
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'message' => 'فشل رفع النسخة الاحتياطية.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * GET /api/admin/backups/history
+     */
+    public function history(): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->backupService->getHistory(50),
+        ]);
+    }
 }

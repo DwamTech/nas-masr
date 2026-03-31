@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Section;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 
 class Listing extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'category_id',
         'user_id',

@@ -333,8 +333,11 @@ Route::prefix('admin')
         // Backup Routes
         Route::prefix('backups')->middleware('admin')->group(function () {
             Route::get('/diagnostics', [\App\Http\Controllers\Admin\BackupController::class, 'diagnostics']);
+            Route::get('/history', [\App\Http\Controllers\Admin\BackupController::class, 'history']);
             Route::get('/', [\App\Http\Controllers\Admin\BackupController::class, 'index']);
             Route::post('/', [\App\Http\Controllers\Admin\BackupController::class, 'store']);
+            Route::post('/upload', [\App\Http\Controllers\Admin\BackupController::class, 'upload']);
+            Route::get('/{id}/download', [\App\Http\Controllers\Admin\BackupController::class, 'download']);
             Route::post('/{id}/restore', [\App\Http\Controllers\Admin\BackupController::class, 'restore']);
             Route::delete('/{id}', [\App\Http\Controllers\Admin\BackupController::class, 'destroy']);
         });

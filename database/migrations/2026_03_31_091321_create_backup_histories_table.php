@@ -16,8 +16,8 @@ return new class extends Migration {
             // المسار الكامل داخل الـ disk: e.g. backups/backup_2026_03_31_db.sql.gz
             $table->string('file_path');
 
-            // نوع الـ backup: full / db / files
-            $table->enum('type', ['full', 'db', 'files'])->default('db');
+            // نوع الـ backup: full / db / files / upload
+            $table->enum('type', ['full', 'db', 'files', 'upload'])->default('db');
 
             // حالة العملية
             $table->enum('status', ['pending', 'success', 'failed'])->default('pending');

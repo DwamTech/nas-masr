@@ -29,7 +29,7 @@ class BestAdvertiserController extends Controller
         $featured = BestAdvertiser::active()
             ->whereRaw('JSON_CONTAINS(category_ids, ?)', [json_encode((int) $categoryId)])
             ->with('user')
-            // ->orderBy('rank')
+            ->orderBy('rank')
             ->get();
 
         $userIds = $featured->pluck('user_id')->map(fn($v) => (int)$v)->all();
@@ -173,6 +173,7 @@ class BestAdvertiserController extends Controller
             'category_ids'   => ['required', 'array'],
             'category_ids.*' => ['integer'],
             'max_listings'   => ['nullable', 'integer'],
+            'rank'           => ['nullable', 'integer', 'min:0'],
             'is_active'      => ['boolean'],
         ]);
 
@@ -256,6 +257,8 @@ class BestAdvertiserController extends Controller
                 'id' => $bestAdvertiser->id,
                 'user_id' => $bestAdvertiser->user_id,
                 'category_ids' => $bestAdvertiser->category_ids,
+                'max_listings' => $bestAdvertiser->max_listings,
+                'rank' => $bestAdvertiser->rank,
                 'is_active' => $bestAdvertiser->is_active,
                 'categories' => $categories,
             ]

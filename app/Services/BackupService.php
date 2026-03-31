@@ -116,6 +116,79 @@ class BackupService
         }
     }
 
+    public function getBackup(int $id): BackupHistory
+    {
+        return BackupHistory::findOrFail($id);
+    }
+
+    public function getBackupPath(BackupHistory $backup): string
+    {
+        $disk = Storage::disk(BackupConfig::DISK);
+        
+        if (!$disk->exists($backup->file_path)) {
+            throw new RuntimeException("Backup file not found: {$backup->file_path}");
+        }
+
+        return $disk->path($backup->file_path);
+    }
+
+    public function uploadBackup(\Illuminate\Http\UploadedFile $file): BackupHistory
+    {
+        $originalName = $file->getClientOriginalName();
+        $fileName = pathinfo($originalName, PATHINFO_FILENAME);
+        $extension = $file->getClientOriginalExtension();
+        
+        // Generate unique filename to avoid conflicts
+        $uniqueFileName = $fileName . '_' . now()->format('YmdHis') . '.' . $extension;
+        $filePath = BackupConfig::FOLDER . '/' . $uniqueFileName;
+
+        try {
+            // Store the uploaded file
+            $content = file_get_contents($file->getRealPath());
+            Storage::disk(BackupConfig::DISK)->put($filePath, $content);
+
+            // Create record
+            $record = BackupHistory::create([
+                'file_name'  => $uniqueFileName,
+                'file_path'  => $filePath,
+                'type'       => 'upload',
+                'status'     => 'success',
+                'size'       => $file->getSize(),
+                'created_by' => Auth::id(),
+            ]);
+
+            $this->log('info', 'Backup uploaded.', $record);
+
+            event(new BackupCreated($record));
+
+            return $record;
+
+        } catch (\Throwable $e) {
+            $this->cleanupFile($filePath);
+            $this->log('error', 'Upload failed.', null, $e);
+
+            throw new RuntimeException('Upload failed: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    public function getHistory(int $limit = 50): \Illuminate\Support\Collection
+    {
+        return BackupHistory::with('creator:id,name')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn(BackupHistory $b) => [
+                'id'             => $b->id,
+                'file_name'      => $b->file_name,
+                'type'           => $b->type,
+                'status'         => $b->status,
+                'size'           => $b->size,
+                'size_formatted' => $b->formattedSize(),
+                'created_by'     => $b->creator?->name,
+                'created_at'     => $b->created_at->toIso8601String(),
+            ]);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Database Helpers
@@ -311,11 +384,11 @@ class BackupService
         }
     }
 
-    private function log(string $level, string $message, BackupHistory $record, ?\Throwable $e = null): void
+    private function log(string $level, string $message, ?BackupHistory $record, ?\Throwable $e = null): void
     {
         $context = [
-            'backup_id' => $record->id,
-            'file'      => $record->file_name,
+            'backup_id' => $record?->id,
+            'file'      => $record?->file_name,
             'actor'     => Auth::id(),
         ];
 
