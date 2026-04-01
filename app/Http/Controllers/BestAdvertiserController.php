@@ -218,10 +218,37 @@ class BestAdvertiserController extends Controller
                 }
             }
 
+            // Handle rank logic
+            $newRank = $data['rank'] ?? 0;
+            $oldRank = $ba?->rank ?? null;
+
             if ($ba) {
+                // Update existing record
+                
+                // If rank changed, shift other records
+                if ($oldRank !== $newRank) {
+                    if ($newRank < $oldRank) {
+                        // Moving up (lower rank number) - shift others down
+                        BestAdvertiser::where('id', '!=', $ba->id)
+                            ->where('rank', '>=', $newRank)
+                            ->where('rank', '<', $oldRank)
+                            ->increment('rank');
+                    } else {
+                        // Moving down (higher rank number) - shift others up
+                        BestAdvertiser::where('id', '!=', $ba->id)
+                            ->where('rank', '>', $oldRank)
+                            ->where('rank', '<=', $newRank)
+                            ->decrement('rank');
+                    }
+                }
+                
                 $ba->update($data);
                 $message = 'Best advertiser updated';
             } else {
+                // New record - shift all records with rank >= newRank down by 1
+                BestAdvertiser::where('rank', '>=', $newRank)
+                    ->increment('rank');
+                
                 $ba = BestAdvertiser::create($data);
                 $message = 'Best advertiser created';
             }
